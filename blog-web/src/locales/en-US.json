@@ -1,0 +1,86 @@
+{
+  "nav": {
+    "home": "Home",
+    "articles": "Articles",
+    "archive": "Archive",
+    "about": "About",
+    "contact": "Contact",
+    "search": "Search",
+    "skipToContent": "Skip to main content"
+  },
+  "footer": {
+    "defaultCopyright": "© 2026 My Blog. All rights reserved.",
+    "github": "GitHub",
+    "twitter": "Twitter",
+    "email": "Email"
+  },
+  "home": {
+    "latestArticles": "Latest Articles",
+    "viewAll": "View All",
+    "readMore": "Read More",
+    "featured": "Featured"
+  },
+  "article": {
+    "publishedAt": "Published on",
+    "views": "views",
+    "likes": "likes",
+    "comments": "comments",
+    "share": "Share",
+    "tableOfContents": "Table of Contents",
+    "relatedArticles": "Related Articles",
+    "prevArticle": "Previous",
+    "nextArticle": "Next",
+    "minuteRead": "min read"
+  },
+  "comment": {
+    "title": "Comments",
+    "loginToComment": "Login to comment",
+    "placeholder": "Write your thoughts...",
+    "submit": "Submit",
+    "reply": "Reply",
+    "noComments": "No comments yet"
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search articles...",
+    "noResults": "No articles found",
+    "results": "Found {count} articles"
+  },
+  "subscribe": {
+    "title": "Subscribe to Newsletter",
+    "description": "Get the latest articles delivered to your inbox",
+    "emailPlaceholder": "Your email address",
+    "submit": "Subscribe",
+    "success": "Subscribed! Please check your email to confirm.",
+    "confirmed": "🎉 Subscription confirmed! Welcome aboard.",
+    "unsubscribed": "You have been unsubscribed."
+  },
+  "archive": {
+    "title": "Archive",
+    "articles": "{count} articles"
+  },
+  "about": {
+    "title": "About"
+  },
+  "contact": {
+    "title": "Contact",
+    "name": "Name",
+    "email": "Email",
+    "message": "Message",
+    "send": "Send"
+  },
+  "notFound": {
+    "title": "404",
+    "message": "Page not found",
+    "backHome": "Back to Home"
+  },
+  "common": {
+    "loading": "Loading...",
+    "noData": "No data",
+    "readingMode": "Reading Mode"
+  },
+  "language": {
+    "zh": "中",
+    "en": "En"
+  }
+}

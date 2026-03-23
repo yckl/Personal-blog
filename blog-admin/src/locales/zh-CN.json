@@ -1,0 +1,78 @@
+{
+  "admin": {
+    "title": "博客后台",
+    "menu": {
+      "dashboard": "仪表盘",
+      "articles": "文章管理",
+      "categories": "分类管理",
+      "tags": "标签管理",
+      "series": "系列管理",
+      "comments": "评论管理",
+      "media": "媒体库",
+      "subscribers": "订阅者",
+      "newsletter": "邮件通讯",
+      "products": "数字产品",
+      "seo": "SEO 优化",
+      "menus": "菜单管理",
+      "settings": "系统设置",
+      "users": "用户管理",
+      "systemLog": "系统日志"
+    },
+    "header": {
+      "home": "首页",
+      "logout": "退出登录"
+    },
+    "role": {
+      "superAdmin": "超级管理员",
+      "admin": "管理员",
+      "editor": "编辑",
+      "author": "作者"
+    }
+  },
+  "login": {
+    "title": "博客后台登录",
+    "username": "用户名",
+    "password": "密码",
+    "rememberMe": "记住我",
+    "submit": "登录",
+    "loggingIn": "登录中...",
+    "usernamePlaceholder": "请输入用户名",
+    "passwordPlaceholder": "请输入密码"
+  },
+  "dashboard": {
+    "title": "仪表盘",
+    "totalArticles": "文章总数",
+    "totalViews": "总浏览量",
+    "totalComments": "评论总数",
+    "totalSubscribers": "订阅者总数",
+    "trendChart": "趋势图",
+    "hotArticles": "热门文章",
+    "recentComments": "最新评论",
+    "views": "浏览量",
+    "comments": "评论",
+    "last7Days": "最近7天",
+    "last30Days": "最近30天"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "create": "新建",
+    "search": "搜索",
+    "loading": "加载中...",
+    "confirm": "确认",
+    "success": "操作成功",
+    "error": "操作失败",
+    "noData": "暂无数据",
+    "actions": "操作",
+    "status": "状态",
+    "title": "标题",
+    "date": "日期"
+  },
+  "language": {
+    "zh": "中",
+    "en": "En",
+    "switchTo": "切换至{lang}"
+  }
+}

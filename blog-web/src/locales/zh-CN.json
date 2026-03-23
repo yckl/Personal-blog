@@ -1,0 +1,86 @@
+{
+  "nav": {
+    "home": "首页",
+    "articles": "文章",
+    "archive": "归档",
+    "about": "关于",
+    "contact": "联系",
+    "search": "搜索",
+    "skipToContent": "跳至正文"
+  },
+  "footer": {
+    "defaultCopyright": "© 2026 我的博客。保留所有权利。",
+    "github": "GitHub",
+    "twitter": "推特",
+    "email": "邮箱"
+  },
+  "home": {
+    "latestArticles": "最新文章",
+    "viewAll": "查看全部",
+    "readMore": "阅读更多",
+    "featured": "精选"
+  },
+  "article": {
+    "publishedAt": "发布于",
+    "views": "浏览",
+    "likes": "点赞",
+    "comments": "评论",
+    "share": "分享",
+    "tableOfContents": "目录",
+    "relatedArticles": "相关文章",
+    "prevArticle": "上一篇",
+    "nextArticle": "下一篇",
+    "minuteRead": "分钟阅读"
+  },
+  "comment": {
+    "title": "评论",
+    "loginToComment": "登录后可评论",
+    "placeholder": "写下你的想法...",
+    "submit": "提交评论",
+    "reply": "回复",
+    "noComments": "暂无评论"
+  },
+  "search": {
+    "title": "搜索",
+    "placeholder": "搜索文章...",
+    "noResults": "没有找到相关文章",
+    "results": "找到 {count} 篇文章"
+  },
+  "subscribe": {
+    "title": "订阅通讯",
+    "description": "获取最新文章更新",
+    "emailPlaceholder": "你的邮箱地址",
+    "submit": "订阅",
+    "success": "订阅成功！请查收确认邮件。",
+    "confirmed": "🎉 订阅确认成功！欢迎加入。",
+    "unsubscribed": "你已成功退订。"
+  },
+  "archive": {
+    "title": "文章归档",
+    "articles": "{count} 篇文章"
+  },
+  "about": {
+    "title": "关于"
+  },
+  "contact": {
+    "title": "联系我们",
+    "name": "姓名",
+    "email": "邮箱",
+    "message": "留言",
+    "send": "发送"
+  },
+  "notFound": {
+    "title": "404",
+    "message": "页面未找到",
+    "backHome": "返回首页"
+  },
+  "common": {
+    "loading": "加载中...",
+    "noData": "暂无数据",
+    "readingMode": "阅读模式"
+  },
+  "language": {
+    "zh": "中",
+    "en": "En"
+  }
+}

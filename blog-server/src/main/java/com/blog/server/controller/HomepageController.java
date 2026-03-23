@@ -1,0 +1,164 @@
+package com.blog.server.controller;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.blog.server.common.Result;
+import com.blog.server.entity.*;
+import com.blog.server.mapper.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Aggregated public homepage API — single call returns all homepage data.
+ */
+@RestController
+@RequestMapping("/api/public")
+@RequiredArgsConstructor
+public class HomepageController {
+
+    private final ArticleMapper articleMapper;
+    private final ArticleTagRelMapper tagRelMapper;
+    private final ArticleTagMapper tagMapper;
+    private final ArticleCategoryMapper categoryMapper;
+    private final ArticleSeriesMapper seriesMapper;
+    private final ArticleSeriesRelMapper seriesRelMapper;
+    private final SiteConfigMapper siteConfigMapper;
+
+    @GetMapping("/homepage")
+    public Result<Map<String, Object>> getHomepageData() {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+        // --- Site Info from config ---
+        List<SiteConfig> configs = siteConfigMapper.selectList(new LambdaQueryWrapper<>());
+        Map<String, String> siteInfo = new LinkedHashMap<>();
+        for (SiteConfig c : configs) {
+            siteInfo.put(c.getConfigKey(), c.getConfigValue());
+        }
+        result.put("siteInfo", siteInfo);
+
+        // --- Hero config ---
+        Map<String, String> hero = new LinkedHashMap<>();
+        hero.put("badge", siteInfo.getOrDefault("hero_badge", "✨ Personal Blog"));
+        hero.put("title", siteInfo.getOrDefault("hero_title", "Thoughts, Stories & Ideas Worth Sharing"));
+        hero.put("subtitle", siteInfo.getOrDefault("hero_subtitle", "Exploring technology, creativity, and the art of building things that matter."));
+        hero.put("ctaText", siteInfo.getOrDefault("hero_cta_text", "Read Articles →"));
+        hero.put("ctaLink", siteInfo.getOrDefault("hero_cta_link", "/articles"));
+        result.put("hero", hero);
+
+        // --- All published articles ---
+        List<Article> allPublished = articleMapper.selectList(
+                new LambdaQueryWrapper<Article>()
+                        .eq(Article::getStatus, "PUBLISHED")
+                        .orderByDesc(Article::getPublishedAt));
+
+        // Preload categories map
+        List<ArticleCategory> cats = categoryMapper.selectList(new LambdaQueryWrapper<>());
+        Map<Long, String> catNameMap = cats.stream()
+                .collect(Collectors.toMap(ArticleCategory::getId, ArticleCategory::getName, (a, b) -> a));
+
+        // Preload tags map
+        List<ArticleTag> allTags = tagMapper.selectList(new LambdaQueryWrapper<>());
+        Map<Long, ArticleTag> tagMap = allTags.stream()
+                .collect(Collectors.toMap(ArticleTag::getId, t -> t, (a, b) -> a));
+        List<ArticleTagRel> allRels = tagRelMapper.selectList(new LambdaQueryWrapper<>());
+        Map<Long, List<ArticleTag>> articleTagsMap = new HashMap<>();
+        for (ArticleTagRel rel : allRels) {
+            ArticleTag tag = tagMap.get(rel.getTagId());
+            if (tag != null) {
+                articleTagsMap.computeIfAbsent(rel.getArticleId(), k -> new ArrayList<>()).add(tag);
+            }
+        }
+
+        // --- Top / pinned (isTop = true) ---
+        List<Map<String, Object>> top = allPublished.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsTop()))
+                .limit(6)
+                .map(a -> toArticleCard(a, catNameMap, articleTagsMap))
+                .collect(Collectors.toList());
+        result.put("topArticles", top);
+
+        // --- Featured (isFeatured = true) ---
+        List<Map<String, Object>> featured = allPublished.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsFeatured()))
+                .limit(6)
+                .map(a -> toArticleCard(a, catNameMap, articleTagsMap))
+                .collect(Collectors.toList());
+        result.put("featuredArticles", featured);
+
+        // --- Latest (newest 10, excluding top/featured to diversify the homepage) ---
+        Set<Long> excludedLatestIds = new LinkedHashSet<>();
+        top.forEach(f -> excludedLatestIds.add(((Number) f.get("id")).longValue()));
+        featured.forEach(f -> excludedLatestIds.add(((Number) f.get("id")).longValue()));
+        List<Map<String, Object>> latest = allPublished.stream()
+                .filter(a -> !excludedLatestIds.contains(a.getId()))
+                .limit(10)
+                .map(a -> toArticleCard(a, catNameMap, articleTagsMap))
+                .collect(Collectors.toList());
+        result.put("latestArticles", latest);
+
+        // --- Popular (by view count, top 6) ---
+        List<Map<String, Object>> popular = allPublished.stream()
+                .sorted(Comparator.comparingInt((Article a) -> a.getViewCount() != null ? a.getViewCount() : 0).reversed())
+                .limit(6)
+                .map(a -> toArticleCard(a, catNameMap, articleTagsMap))
+                .collect(Collectors.toList());
+        result.put("popularArticles", popular);
+
+        // --- Series (with article count) ---
+        List<ArticleSeries> seriesList = seriesMapper.selectList(
+                new LambdaQueryWrapper<ArticleSeries>().orderByAsc(ArticleSeries::getSortOrder));
+        List<ArticleSeriesRel> seriesRels = seriesRelMapper.selectList(new LambdaQueryWrapper<>());
+        Map<Long, Long> seriesCountMap = seriesRels.stream()
+                .collect(Collectors.groupingBy(ArticleSeriesRel::getSeriesId, Collectors.counting()));
+
+        List<Map<String, Object>> series = seriesList.stream().map(s -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", s.getId());
+            m.put("name", s.getName());
+            m.put("slug", s.getSlug());
+            m.put("description", s.getDescription());
+            m.put("coverImage", s.getCoverImage());
+            m.put("articleCount", seriesCountMap.getOrDefault(s.getId(), 0L));
+            return m;
+        }).collect(Collectors.toList());
+        result.put("seriesList", series);
+
+        // --- Stats ---
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("totalArticles", allPublished.size());
+        stats.put("totalViews", allPublished.stream().mapToInt(a -> a.getViewCount() != null ? a.getViewCount() : 0).sum());
+        result.put("stats", stats);
+
+        return Result.ok(result);
+    }
+
+    private Map<String, Object> toArticleCard(Article a, Map<Long, String> catNameMap, Map<Long, List<ArticleTag>> articleTagsMap) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", a.getId());
+        m.put("title", a.getTitle());
+        m.put("slug", a.getSlug());
+        m.put("excerpt", a.getExcerpt());
+        m.put("coverImage", a.getCoverImage());
+        m.put("publishedAt", a.getPublishedAt());
+        m.put("viewCount", a.getViewCount());
+        m.put("likeCount", a.getLikeCount());
+        m.put("commentCount", a.getCommentCount());
+        m.put("wordCount", a.getWordCount());
+        m.put("isFeatured", a.getIsFeatured());
+        m.put("isTop", a.getIsTop());
+        m.put("categoryName", a.getCategoryId() != null ? catNameMap.get(a.getCategoryId()) : null);
+
+        List<ArticleTag> tags = articleTagsMap.getOrDefault(a.getId(), Collections.emptyList());
+        List<Map<String, Object>> tagList = tags.stream().map(t -> {
+            Map<String, Object> tm = new LinkedHashMap<>();
+            tm.put("id", t.getId());
+            tm.put("name", t.getName());
+            tm.put("slug", t.getSlug());
+            return tm;
+        }).collect(Collectors.toList());
+        m.put("tags", tagList);
+        return m;
+    }
+}

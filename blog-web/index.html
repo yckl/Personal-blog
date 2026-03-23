@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#6366f1" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="/rss.xml" />
+    <title>blog-web</title>
+  </head>
+  <body>
+    <script>
+      // No-flicker: apply saved theme before first paint
+      (function() {
+        var t = localStorage.getItem('blog-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+        var fs = localStorage.getItem('blog-font-size');
+        if (fs) document.documentElement.style.setProperty('--reading-font-size', fs + 'px');
+        var lw = localStorage.getItem('blog-line-width');
+        if (lw) {
+          var m = { narrow: '720px', normal: '1100px', wide: '1400px' };
+          document.documentElement.style.setProperty('--max-width', m[lw] || '1100px');
+        }
+      })();
+    </script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+    <script>
+      // PWA: Register service worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').catch(function() {});
+        });
+      }
+    </script>
+  </body>
+</html>
