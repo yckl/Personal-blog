@@ -1,0 +1,294 @@
+/*
+ * Global Dark Theme Overrides for Element Plus
+ * Must be imported AFTER element-plus/dist/index.css
+ * Overrides :root CSS variables so ALL EP components render dark
+ */
+
+:root {
+  /* ===== Backgrounds ===== */
+  --el-bg-color: #0a0a0a;
+  --el-bg-color-page: #0a0a0a;
+  --el-bg-color-overlay: rgba(15, 23, 42, 0.95);
+
+  /* Fill colors (input backgrounds, card fills) */
+  --el-fill-color: rgba(255, 255, 255, 0.05);
+  --el-fill-color-light: rgba(255, 255, 255, 0.03);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.02);
+  --el-fill-color-extra-light: rgba(255, 255, 255, 0.015);
+  --el-fill-color-dark: rgba(255, 255, 255, 0.08);
+  --el-fill-color-darker: rgba(255, 255, 255, 0.1);
+  --el-fill-color-blank: rgba(255, 255, 255, 0.05);
+
+  /* ===== Text Colors ===== */
+  --el-text-color-primary: #f8fafc;
+  --el-text-color-regular: #94a3b8;
+  --el-text-color-secondary: #64748b;
+  --el-text-color-placeholder: #475569;
+  --el-text-color-disabled: #334155;
+
+  /* ===== Border Colors ===== */
+  --el-border-color: rgba(255, 255, 255, 0.08);
+  --el-border-color-light: rgba(255, 255, 255, 0.05);
+  --el-border-color-lighter: rgba(255, 255, 255, 0.04);
+  --el-border-color-extra-light: rgba(255, 255, 255, 0.03);
+  --el-border-color-dark: rgba(255, 255, 255, 0.12);
+  --el-border-color-darker: rgba(255, 255, 255, 0.15);
+  --el-border-color-hover: rgba(168, 85, 247, 0.2);
+
+  /* ===== Primary Color ===== */
+  --el-color-primary: #a855f7;
+  --el-color-primary-light-3: #c084fc;
+  --el-color-primary-light-5: rgba(168, 85, 247, 0.5);
+  --el-color-primary-light-7: rgba(168, 85, 247, 0.3);
+  --el-color-primary-light-8: rgba(168, 85, 247, 0.2);
+  --el-color-primary-light-9: rgba(168, 85, 247, 0.1);
+  --el-color-primary-dark-2: #7c3aed;
+
+  /* ===== Input ===== */
+  --el-input-bg-color: rgba(255, 255, 255, 0.05);
+  --el-input-border-color: rgba(255, 255, 255, 0.1);
+  --el-input-hover-border-color: rgba(168, 85, 247, 0.3);
+  --el-input-focus-border-color: #a855f7;
+  --el-input-text-color: #f8fafc;
+  --el-input-placeholder-color: #475569;
+  --el-input-icon-color: #64748b;
+
+  /* ===== Table ===== */
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: rgba(168, 85, 247, 0.04);
+  --el-table-row-hover-bg-color: rgba(168, 85, 247, 0.06);
+  --el-table-current-row-bg-color: rgba(168, 85, 247, 0.08);
+  --el-table-border-color: rgba(255, 255, 255, 0.04);
+  --el-table-text-color: #94a3b8;
+  --el-table-header-text-color: #94a3b8;
+
+  /* ===== Dialog ===== */
+  --el-dialog-bg-color: rgba(15, 23, 42, 0.95);
+
+  /* ===== Pagination ===== */
+  --el-pagination-bg-color: transparent;
+  --el-pagination-button-bg-color: rgba(255, 255, 255, 0.05);
+  --el-pagination-button-color: #94a3b8;
+  --el-pagination-hover-color: #c084fc;
+  --el-pagination-font-size: 13px;
+
+  /* ===== Card ===== */
+  --el-card-bg-color: rgba(15, 23, 42, 0.6);
+  --el-card-border-color: rgba(168, 85, 247, 0.1);
+
+  /* ===== Disabled ===== */
+  --el-disabled-bg-color: rgba(255, 255, 255, 0.02);
+  --el-disabled-text-color: #334155;
+  --el-disabled-border-color: rgba(255, 255, 255, 0.05);
+
+  /* ===== Overlay / Mask ===== */
+  --el-overlay-color: rgba(0, 0, 0, 0.6);
+  --el-overlay-color-light: rgba(0, 0, 0, 0.4);
+  --el-overlay-color-lighter: rgba(0, 0, 0, 0.3);
+  --el-mask-color: rgba(10, 10, 10, 0.7);
+
+  /* ===== Popup / Popper ===== */
+  --el-popup-modal-bg-color: rgba(0, 0, 0, 0.6);
+
+  /* ===== Box Shadow (darker) ===== */
+  --el-box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  --el-box-shadow-light: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --el-box-shadow-lighter: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --el-box-shadow-dark: 0 16px 64px rgba(0, 0, 0, 0.6);
+
+  /* ===== Switch ===== */
+  --el-switch-off-color: rgba(255, 255, 255, 0.1);
+
+  /* ===== Menu ===== */
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: #94a3b8;
+  --el-menu-active-color: #c084fc;
+  --el-menu-hover-bg-color: rgba(168, 85, 247, 0.06);
+  --el-menu-item-height: 48px;
+
+  /* ===== Tabs ===== */
+  --el-tabs-header-height: 48px;
+
+  /* ===== Button text override ===== */
+  --el-button-text-color: #f8fafc;
+}
+
+/* Force white text on all typed buttons (solid, plain, text, link variants) */
+.el-button--primary,
+.el-button--success,
+.el-button--warning,
+.el-button--info,
+.el-button--danger { color: #fff !important; }
+.el-button--primary.is-text,
+.el-button--success.is-text,
+.el-button--warning.is-text,
+.el-button--info.is-text,
+.el-button--danger.is-text,
+.el-button--primary.is-link,
+.el-button--success.is-link,
+.el-button--warning.is-link,
+.el-button--info.is-link,
+.el-button--danger.is-link { color: #fff !important; }
+
+/* ===== Force dark input wrapper (belt and suspenders) ===== */
+.el-input__wrapper {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+}
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.3) inset !important;
+}
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #a855f7 inset, 0 0 16px rgba(168, 85, 247, 0.15) !important;
+}
+.el-input__inner {
+  color: #f8fafc !important;
+  caret-color: #c084fc;
+}
+.el-input__inner::placeholder {
+  color: #475569 !important;
+}
+
+/* Textarea */
+.el-textarea__inner {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
+}
+.el-textarea__inner:focus {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.15) !important;
+}
+
+/* ===== Select wrapper ===== */
+.el-select__wrapper {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset !important;
+}
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.2) inset !important;
+}
+.el-select__placeholder {
+  color: #475569 !important;
+}
+
+/* ===== Table force dark rows ===== */
+.el-table {
+  --el-table-row-hover-bg-color: rgba(168, 85, 247, 0.06) !important;
+  --el-table-current-row-bg-color: rgba(168, 85, 247, 0.08) !important;
+}
+.el-table tr {
+  background: transparent !important;
+}
+.el-table--enable-row-hover .el-table__body tr:hover > td {
+  background: rgba(168, 85, 247, 0.08) !important;
+  box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.12);
+}
+.el-table__body tr.current-row > td {
+  background: rgba(168, 85, 247, 0.08) !important;
+}
+.el-table--striped .el-table__body tr.el-table__row--striped td {
+  background: rgba(255, 255, 255, 0.015) !important;
+}
+
+/* ===== Pagination force dark ===== */
+.el-pager li {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #94a3b8 !important;
+}
+.el-pager li.is-active {
+  background: linear-gradient(135deg, #a855f7, #7c3aed) !important;
+  color: #fff !important;
+}
+
+/* ===== Checkbox ===== */
+.el-checkbox__inner {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #a855f7 !important;
+  border-color: #a855f7 !important;
+}
+
+/* ===== Popper (body-level elements) ===== */
+.el-select__popper,
+.el-select-dropdown {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(168, 85, 247, 0.12) !important;
+}
+.el-select-dropdown__item {
+  color: #94a3b8 !important;
+}
+.el-select-dropdown__item:hover,
+.el-select-dropdown__item.is-hovering {
+  background: rgba(168, 85, 247, 0.08) !important;
+}
+.el-select-dropdown__item.is-selected {
+  color: #c084fc !important;
+  font-weight: 700;
+}
+
+/* Popover / Popconfirm */
+.el-popper {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-color: rgba(168, 85, 247, 0.1) !important;
+}
+.el-popper__arrow::before {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-color: rgba(168, 85, 247, 0.1) !important;
+}
+.el-popconfirm__main {
+  color: #f8fafc !important;
+}
+
+/* Dialog */
+.el-dialog {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(168, 85, 247, 0.1);
+  border-radius: 24px !important;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(168, 85, 247, 0.08);
+}
+.el-dialog__title {
+  color: #f8fafc !important;
+}
+.el-dialog__header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.el-dialog__footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Message Box */
+.el-message-box {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(168, 85, 247, 0.1) !important;
+}
+.el-message-box__title { color: #f8fafc !important; }
+.el-message-box__message { color: #94a3b8 !important; }
+
+/* Date picker */
+.el-picker__popper {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(168, 85, 247, 0.1) !important;
+}
+
+/* Drawer */
+.el-drawer {
+  background: rgba(15, 23, 42, 0.95) !important;
+}
+.el-drawer__header {
+  color: #f8fafc !important;
+}
+
+/* Form label */
+.el-form-item__label {
+  color: #94a3b8 !important;
+}
+
+/* Loading mask */
+.el-loading-mask {
+  background: rgba(10, 10, 10, 0.7) !important;
+}

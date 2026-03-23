@@ -16,12 +16,12 @@ const router = createRouter({
       children: [
         {
           path: 'dashboard',
-          name: 'Dashboard',
+          name: '仪表盘',
           component: () => import('../views/Dashboard.vue')
         },
         {
           path: 'articles',
-          name: 'ArticleList',
+          name: '文章列表',
           component: () => import('../views/article/ArticleList.vue'),
           meta: { permission: 'article:view' }
         },
@@ -39,37 +39,37 @@ const router = createRouter({
         },
         {
           path: 'categories',
-          name: 'CategoryList',
+          name: '分类管理',
           component: () => import('../views/category/CategoryList.vue'),
           meta: { permission: 'article:edit' }
         },
         {
           path: 'tags',
-          name: 'TagList',
+          name: '标签管理',
           component: () => import('../views/tag/TagList.vue'),
           meta: { permission: 'article:edit' }
         },
         {
           path: 'series',
-          name: 'SeriesList',
+          name: '系列管理',
           component: () => import('../views/series/SeriesList.vue'),
           meta: { permission: 'article:edit' }
         },
         {
           path: 'comments',
-          name: 'CommentList',
+          name: '评论管理',
           component: () => import('../views/comment/CommentList.vue'),
           meta: { permission: 'comment:review' }
         },
         {
           path: 'media',
-          name: 'MediaLibrary',
+          name: '媒体库',
           component: () => import('../views/media/MediaLibrary.vue'),
           meta: { permission: 'media:upload' }
         },
         {
           path: 'subscribers',
-          name: 'SubscriberList',
+          name: '订阅者',
           component: () => import('../views/subscriber/SubscriberList.vue'),
           meta: { roles: ['SUPER_ADMIN', 'ADMIN', 'EDITOR'] }
         },
@@ -93,31 +93,43 @@ const router = createRouter({
         },
         {
           path: 'seo',
-          name: 'SeoSettings',
+          name: '搜索引擎优化',
           component: () => import('../views/settings/SeoSettings.vue'),
           meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
         },
         {
           path: 'menus',
-          name: 'MenuSettings',
+          name: '菜单管理',
           component: () => import('../views/settings/MenuSettings.vue'),
           meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
         },
         {
           path: 'users',
-          name: 'UserList',
+          name: '用户管理',
           component: () => import('../views/settings/UserList.vue'),
           meta: { roles: ['SUPER_ADMIN'] }
         },
         {
+          path: 'messages',
+          name: '消息留言',
+          component: () => import('../views/message/MessageList.vue'),
+          meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
+        },
+        {
+          path: 'timeline',
+          name: '旅程时间线',
+          component: () => import('../views/settings/TimelineList.vue'),
+          meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
+        },
+        {
           path: 'system-log',
-          name: 'SystemLog',
+          name: '系统日志',
           component: () => import('../views/settings/SystemLog.vue'),
           meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
         },
         {
           path: 'products',
-          name: 'ProductList',
+          name: '数字产品',
           component: () => import('../views/product/ProductList.vue'),
           meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
         }

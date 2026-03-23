@@ -167,19 +167,19 @@ public class AiServiceImpl implements AiService {
         return text.length() > maxInputLength ? text.substring(0, maxInputLength) : text;
     }
 
-    /** Provide mock results when no API key is configured */
+    /** Provide useful mock results when no API key is configured */
     private String getFallbackResult(String taskType, String input) {
-        String snippet = input != null && input.length() > 50 ? input.substring(0, 50) + "..." : (input != null ? input : "");
+        String snippet = input != null && input.length() > 30 ? input.substring(0, 30) : (input != null ? input : "");
         return switch (taskType) {
-            case "title" -> "[\"Suggested Title 1 based on: " + snippet + "\", \"Suggested Title 2\", \"Suggested Title 3\"]";
-            case "summary" -> "This article explores key concepts and provides practical insights. Configure AI API key for real results.";
-            case "seo_title" -> "[\"SEO Title 1\", \"SEO Title 2\", \"SEO Title 3\"]";
-            case "meta_description" -> "A comprehensive guide covering important topics. Configure AI API key in application.yml for real results.";
-            case "outline" -> "## Introduction\n\n## Key Concepts\n\n### Concept 1\n\n### Concept 2\n\n## Practical Application\n\n## Conclusion";
-            case "tags" -> "[\"technology\", \"tutorial\", \"guide\", \"development\", \"best-practices\"]";
-            case "newsletter" -> "Don't miss our latest article! We cover important topics that will help you stay ahead. Read the full article on our blog.";
+            case "title" -> "[\"" + snippet + " — 深度解析与实战指南\", \"从零理解" + snippet + "：核心概念全解\", \"" + snippet + "最佳实践总结\"]";
+            case "summary" -> "本文深入探讨了" + snippet + "的核心概念与实践应用，为读者提供了清晰的理解路径和实用的操作建议。（AI 未配置，此为默认摘要，请在 application.yml 中设置 ai.api-key）";
+            case "seo_title" -> "[\"" + snippet + " 完全指南 | 博客\", \"深入理解" + snippet + " - 实战教程\", \"" + snippet + " 从入门到精通\"]";
+            case "meta_description" -> "深入了解" + snippet + "的核心概念、最佳实践与常见问题。本文为您提供全面的指导。（请配置 AI API Key 获取真实结果）";
+            case "outline" -> "## 引言\n\n## 核心概念\n\n### 概念一\n\n### 概念二\n\n## 实践应用\n\n### 场景分析\n\n### 代码示例\n\n## 常见问题\n\n## 总结与展望";
+            case "tags" -> "[\"技术\", \"教程\", \"最佳实践\", \"开发\", \"指南\"]";
+            case "newsletter" -> "本期推荐文章深入探讨了" + snippet + "的关键要点。无论你是初学者还是有经验的开发者，都能从中获得启发。点击阅读全文了解更多。";
             case "internal_links" -> "[]";
-            default -> "Configure AI API key for real results.";
+            default -> "AI 未配置。请在 application.yml 中设置 ai.api-key 以获取真实结果。";
         };
     }
 }

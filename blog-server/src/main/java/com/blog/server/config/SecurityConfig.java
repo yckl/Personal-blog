@@ -39,9 +39,14 @@ public class SecurityConfig {
                 ).permitAll()
                 // Public endpoints
                 .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/article/*/like").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/article/*/favorite").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/public/article/*/share").permitAll()
                 .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
                 .requestMatchers("/api/subscribers/subscribe").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/comments").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/comments/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/comments/*/like").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/visits").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/visits/*/stay").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/articles/*/like").permitAll()
@@ -56,12 +61,16 @@ public class SecurityConfig {
                 .requestMatchers("/api/search/**").permitAll()
                 // Newsletter tracking
                 .requestMatchers("/api/newsletter/track/**").permitAll()
-                // Member auth + plans
+                // Member auth + plans (public)
                 .requestMatchers("/api/member/register", "/api/member/login").permitAll()
                 .requestMatchers("/api/member/access-check").permitAll()
                 .requestMatchers("/api/membership/plans").permitAll()
-                // Payment webhooks
+                // Member authenticated endpoints (require ROLE_MEMBER)
+                .requestMatchers("/api/member/*/profile", "/api/member/*/orders").hasRole("MEMBER")
+                .requestMatchers("/api/member/payment/**").hasRole("MEMBER")
+                // Payment webhooks + public payment methods
                 .requestMatchers("/api/payment/webhook/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/payment/methods").permitAll()
                 // Digital products (public store)
                 .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
                 // RSS

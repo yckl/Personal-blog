@@ -29,6 +29,8 @@ public class PublicController {
     private final ArticleTagRelMapper tagRelMapper;
     private final SiteConfigMapper siteConfigMapper;
     private final MenuConfigMapper menuConfigMapper;
+    private final com.blog.server.service.ExperienceTimelineService timelineService;
+    private final com.blog.server.service.ContactMessageService messageService;
 
     // ---- Articles (public) ----
 
@@ -38,8 +40,9 @@ public class PublicController {
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long tagId,
-            @RequestParam(required = false) String keyword) {
-        return Result.ok(articleService.listPublishedArticles(page, size, categoryId, tagId, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String sort) {
+        return Result.ok(articleService.listPublishedArticles(page, size, categoryId, tagId, keyword, sort));
     }
 
     @GetMapping("/articles/{slug}")
@@ -82,6 +85,19 @@ public class PublicController {
     public Result<List<MenuConfig>> getMenus() {
         return Result.ok(menuConfigMapper.selectList(
                 new LambdaQueryWrapper<MenuConfig>().orderByAsc(MenuConfig::getSortOrder)));
+    }
+
+    // ---- Timeline & Contact ----
+
+    @GetMapping("/timeline")
+    public Result<List<com.blog.server.entity.ExperienceTimeline>> getTimeline() {
+        return Result.ok(timelineService.getPublicTimeline());
+    }
+
+    @PostMapping("/messages")
+    public Result<Void> submitMessage(@RequestBody com.blog.server.entity.ContactMessage message) {
+        messageService.submitMessage(message);
+        return Result.ok(null);
     }
 
     // ---- Article Recommendation ----

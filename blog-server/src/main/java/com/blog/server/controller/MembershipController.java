@@ -8,6 +8,7 @@ import com.blog.server.mapper.*;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.blog.server.security.JwtTokenProvider;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ public class MembershipController {
     private final MemberMapper memberMapper;
     private final MembershipPlanMapper planMapper;
     private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
 
     // ============ Public Member Auth ============
 
@@ -89,8 +91,8 @@ public class MembershipController {
         result.put("avatar", member.getAvatar());
         result.put("tier", currentTier);
         result.put("tierExpiresAt", member.getTierExpiresAt());
-        // In production, return a JWT here
-        result.put("token", "member_" + member.getId() + "_" + System.currentTimeMillis());
+        // Generate real JWT token for member
+        result.put("token", jwtTokenProvider.generateMemberToken(member.getId(), member.getEmail()));
         return Result.ok(result);
     }
 

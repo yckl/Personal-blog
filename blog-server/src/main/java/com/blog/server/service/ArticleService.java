@@ -18,9 +18,9 @@ public interface ArticleService {
 
     ArticleVO getArticleBySlug(String slug);
 
-    PageResult<ArticleVO> listArticles(Integer page, Integer size, String status, Long categoryId, Long tagId, String keyword);
+    PageResult<ArticleVO> listArticles(Integer page, Integer size, String status, Long categoryId, Long tagId, String keyword, String sort);
 
-    PageResult<ArticleVO> listPublishedArticles(Integer page, Integer size, Long categoryId, Long tagId, String keyword);
+    PageResult<ArticleVO> listPublishedArticles(Integer page, Integer size, Long categoryId, Long tagId, String keyword, String sort);
 
     void publishArticle(Long id);
 

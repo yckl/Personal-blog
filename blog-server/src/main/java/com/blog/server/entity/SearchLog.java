@@ -14,6 +14,7 @@ public class SearchLog {
 
     private String keyword;
     private Integer resultCount;
+    @TableField("ip_address")
     private String userIp;
 
     @TableField(fill = FieldFill.INSERT)

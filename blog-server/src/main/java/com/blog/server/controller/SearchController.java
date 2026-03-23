@@ -40,7 +40,7 @@ public class SearchController {
             @RequestParam(defaultValue = "20") Integer size,
             HttpServletRequest request) {
 
-        if (!StringUtils.hasText(keyword) || keyword.trim().length() < 2) {
+        if (!StringUtils.hasText(keyword) || keyword.trim().length() < 1) {
             return Result.ok(Map.of("results", Collections.emptyList(), "total", 0));
         }
 
@@ -152,15 +152,17 @@ public class SearchController {
      * Search suggestions — returns matching article titles for autocomplete.
      */
     @GetMapping("/search/suggest")
-    public Result<List<Map<String, Object>>> suggest(@RequestParam String keyword) {
-        if (!StringUtils.hasText(keyword) || keyword.trim().length() < 2) {
+    public Result<List<Map<String, Object>>> suggest(@RequestParam(required = false) String keyword,
+                                                     @RequestParam(required = false, name = "q") String q) {
+        String actualKeyword = StringUtils.hasText(keyword) ? keyword : q;
+        if (!StringUtils.hasText(actualKeyword) || actualKeyword.trim().length() < 1) {
             return Result.ok(Collections.emptyList());
         }
 
         List<Article> matches = articleMapper.selectList(
                 new LambdaQueryWrapper<Article>()
                         .eq(Article::getStatus, "PUBLISHED")
-                        .like(Article::getTitle, keyword.trim())
+                        .like(Article::getTitle, actualKeyword.trim())
                         .orderByDesc(Article::getViewCount)
                         .last("LIMIT 8"));
 

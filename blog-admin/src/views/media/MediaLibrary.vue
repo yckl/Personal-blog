@@ -3,15 +3,18 @@
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-input v-model="keyword" placeholder="Search files..." clearable style="width: 220px" @clear="loadData" @keyup.enter="loadData">
+        <el-input v-model="keyword" placeholder="搜索文件..." clearable style="width: 220px" @clear="loadData" @keyup.enter="loadData">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-select v-model="typeFilter" placeholder="File type" clearable style="width: 140px" @change="loadData">
+        <el-select v-model="typeFilter" placeholder="文件类型" clearable style="width: 140px" @change="loadData">
           <el-option label="Images" value="image" />
           <el-option label="Videos" value="video" />
           <el-option label="Audio" value="audio" />
           <el-option label="Documents" value="document" />
         </el-select>
+        <el-button v-if="selectedFiles.length > 0" type="danger" size="small" @click="handleBatchDelete">
+          🗑️ Delete {{ selectedFiles.length }} selected
+        </el-button>
       </div>
       <el-upload
         :show-file-list="false"
@@ -38,7 +41,8 @@
     >
       <!-- Card Grid -->
       <div class="media-grid" v-loading="loading">
-        <div v-for="file in files" :key="file.id" class="media-card" @click="openDetail(file)">
+        <div v-for="file in files" :key="file.id" class="media-card"
+             :class="{ selected: selectedFiles.includes(file.id) }" @click="openDetail(file)">
           <div class="media-preview">
             <img v-if="file.fileType === 'image'" :src="getUrl(file.thumbnailUrl || file.fileUrl)" loading="lazy" />
             <div v-else-if="file.fileType === 'video'" class="type-icon video">
@@ -51,8 +55,14 @@
               <el-icon :size="36"><Document /></el-icon>
             </div>
             <div class="media-overlay">
-              <el-button circle size="small" @click.stop="copyUrl(file)"><el-icon><CopyDocument /></el-icon></el-button>
-              <el-button circle size="small" type="danger" @click.stop="handleDelete(file)"><el-icon><Delete /></el-icon></el-button>
+              <div class="select-box" @click.stop>
+                <el-checkbox :model-value="selectedFiles.includes(file.id)" @change="toggleSelect(file.id)" size="large" />
+              </div>
+              <div class="action-buttons">
+                <el-button type="primary" title="复制链接" @click.stop="copyUrl(file)"><el-icon><CopyDocument /></el-icon></el-button>
+                <el-button type="success" title="下载 / 预览" tag="a" :href="getUrl(file.fileUrl)" target="_blank" @click.stop><el-icon><Download /></el-icon></el-button>
+                <el-button type="danger" title="删除" @click.stop="handleDelete(file)"><el-icon><Delete /></el-icon></el-button>
+              </div>
             </div>
           </div>
           <div class="media-info">
@@ -88,17 +98,20 @@
     <el-dialog v-model="detailVisible" title="File Details" width="520px" destroy-on-close>
       <div v-if="selectedFile" class="detail-content">
         <div class="detail-preview">
-          <img v-if="selectedFile.fileType === 'image'" :src="getUrl(selectedFile.fileUrl)" style="max-width: 100%; border-radius: 8px;" />
-          <div v-else class="type-icon doc" style="width: 100%; height: 200px;">
-            <el-icon :size="64"><Document /></el-icon>
+          <img v-if="selectedFile.fileType === 'image'" :src="getUrl(selectedFile.fileUrl)" style="max-width: 100%; border-radius: 8px; object-fit: contain; max-height: 400px;" />
+          <video v-else-if="selectedFile.fileType === 'video'" :src="getUrl(selectedFile.fileUrl)" controls style="max-width: 100%; border-radius: 8px; max-height: 400px; background: #000;"></video>
+          <audio v-else-if="selectedFile.fileType === 'audio'" :src="getUrl(selectedFile.fileUrl)" controls style="width: 100%; margin: 20px 0; outline: none;"></audio>
+          <div v-else class="type-icon doc" style="width: 100%; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(168,85,247,0.05); border-radius: 12px; border: 1px dashed rgba(168,85,247,0.2);">
+            <el-icon :size="64" style="margin-bottom: 16px; color: #a855f7;"><Document /></el-icon>
+            <el-button type="primary" tag="a" :href="getUrl(selectedFile.fileUrl)" target="_blank" download>下载 / 预览文件</el-button>
           </div>
         </div>
         <el-descriptions :column="1" border style="margin-top: 16px;">
-          <el-descriptions-item label="Name">{{ selectedFile.originalName }}</el-descriptions-item>
-          <el-descriptions-item label="Type">{{ selectedFile.mimeType }}</el-descriptions-item>
+          <el-descriptions-item label="名称">{{ selectedFile.originalName }}</el-descriptions-item>
+          <el-descriptions-item label="类型">{{ selectedFile.mimeType }}</el-descriptions-item>
           <el-descriptions-item label="Size">{{ formatSize(selectedFile.fileSize) }}</el-descriptions-item>
           <el-descriptions-item v-if="selectedFile.width" label="Dimensions">{{ selectedFile.width }}×{{ selectedFile.height }}</el-descriptions-item>
-          <el-descriptions-item label="URL">
+          <el-descriptions-item label="链接">
             <el-input :model-value="getUrl(selectedFile.fileUrl)" readonly size="small">
               <template #append>
                 <el-button @click="copyUrl(selectedFile)"><el-icon><CopyDocument /></el-icon></el-button>
@@ -111,7 +124,7 @@
         </el-descriptions>
         <div style="margin-top: 16px;">
           <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px;">Alt Text</label>
-          <el-input v-model="altTextEdit" placeholder="Describe this image for accessibility..." />
+          <el-input v-model="altTextEdit" placeholder="描述此图片..." />
           <el-button type="primary" size="small" style="margin-top: 8px;" @click="saveAlt">Save Alt Text</el-button>
         </div>
       </div>
@@ -134,6 +147,22 @@ const typeFilter = ref('')
 const uploading = ref(false)
 const uploadPercent = ref(0)
 const isDragging = ref(false)
+const selectedFiles = ref<number[]>([])
+
+function toggleSelect(id: number) {
+  const idx = selectedFiles.value.indexOf(id)
+  if (idx >= 0) selectedFiles.value.splice(idx, 1)
+  else selectedFiles.value.push(id)
+}
+
+async function handleBatchDelete() {
+  if (selectedFiles.value.length === 0) return
+  await ElMessageBox.confirm(`Delete ${selectedFiles.value.length} files?`, 'Confirm')
+  for (const id of selectedFiles.value) { await deleteMedia(id) }
+  ElMessage.success('已删除')
+  selectedFiles.value = []
+  loadData()
+}
 
 const detailVisible = ref(false)
 const selectedFile = ref<any>(null)
@@ -206,7 +235,7 @@ async function saveAlt() {
 async function handleDelete(file: any) {
   await ElMessageBox.confirm(`Delete "${file.originalName}"?`, 'Confirm')
   await deleteMedia(file.id)
-  ElMessage.success('Deleted')
+  ElMessage.success('已删除')
   if (detailVisible.value) detailVisible.value = false
   loadData()
 }
@@ -224,50 +253,58 @@ onMounted(loadData)
 .toolbar {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
+  background: rgba(15,23,42,0.6); backdrop-filter: blur(16px);
+  border: 1px solid rgba(168,85,247,0.1); border-radius: 16px; padding: 16px 20px;
 }
 .toolbar-left { display: flex; gap: 10px; }
-.upload-trigger :deep(.el-upload-dragger) {
-  padding: 0; border: none; background: none;
-}
+.upload-trigger :deep(.el-upload-dragger) { padding: 0; border: none; background: none; }
+
 .drop-zone { position: relative; min-height: 300px; }
-.drop-zone.active { outline: 3px dashed #409eff; outline-offset: -3px; border-radius: 12px; }
+.drop-zone.active {
+  outline: 3px dashed #a855f7; outline-offset: -3px; border-radius: 16px;
+  background: rgba(168,85,247,0.04);
+}
 .drop-hint {
   position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; background: rgba(64,158,255,0.06);
-  border-radius: 12px; z-index: 10; pointer-events: none;
-  color: #409eff; font-size: 16px; font-weight: 600;
+  align-items: center; justify-content: center;
+  background: rgba(168,85,247,0.06); border-radius: 16px; z-index: 10; pointer-events: none;
+  color: #a855f7; font-size: 16px; font-weight: 600;
 }
+
 .media-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;
 }
 .media-card {
-  border-radius: 12px; overflow: hidden; background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06); cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: 16px; overflow: hidden;
+  background: rgba(15,23,42,0.6); backdrop-filter: blur(16px);
+  border: 1px solid rgba(168,85,247,0.1);
+  cursor: pointer; transition: all 0.3s;
 }
-.media-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.media-card:hover { transform: translateY(-3px); border-color: rgba(168,85,247,0.25); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+.media-card.selected { border-color: #a855f7; box-shadow: 0 0 16px rgba(168,85,247,0.2); }
 .media-preview {
-  height: 160px; background: #f5f7fa; display: flex; align-items: center;
+  height: 160px; background: rgba(15,23,42,0.4); display: flex; align-items: center;
   justify-content: center; overflow: hidden; position: relative;
 }
-.media-preview img { width: 100%; height: 100%; object-fit: cover; }
+.media-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px 16px 0 0; }
 .media-overlay {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  gap: 8px; background: rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.2s;
+  position: absolute; inset: 0; background: rgba(15,23,42,0.85); backdrop-filter: blur(2px);
+  display: flex; flex-direction: column; justify-content: space-between; padding: 12px;
+  opacity: 0; transition: all 0.3s ease;
 }
+.select-box { align-self: flex-start; }
+.action-buttons { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
+.action-buttons .el-button { margin: 0; padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 .media-card:hover .media-overlay { opacity: 1; }
-.type-icon {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; height: 100%; color: #c0c4cc;
-}
-.type-icon.video { background: #fdf6ec; color: #e6a23c; }
-.type-icon.audio { background: #f0f9eb; color: #67c23a; }
-.type-icon.doc { background: #ecf5ff; color: #409eff; }
+.type-icon { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: #475569; }
+.type-icon.video { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.type-icon.audio { background: rgba(34,211,238,0.1); color: #22d3ee; }
+.type-icon.doc { background: rgba(168,85,247,0.1); color: #a855f7; }
 .media-info { padding: 10px 12px; }
-.media-name {
-  font-size: 13px; color: #333; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap;
-}
-.media-meta { font-size: 12px; color: #999; margin-top: 4px; }
+.media-name { font-size: 13px; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-meta { font-size: 12px; color: #475569; margin-top: 4px; }
 .detail-preview { text-align: center; }
+
+@media (min-width: 1440px) { .media-grid { grid-template-columns: repeat(6, 1fr); } }
+@media (max-width: 768px) { .media-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>

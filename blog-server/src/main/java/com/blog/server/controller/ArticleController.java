@@ -53,8 +53,9 @@ public class ArticleController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long tagId,
-            @RequestParam(required = false) String keyword) {
-        return Result.ok(articleService.listArticles(page, size, status, categoryId, tagId, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String sort) {
+        return Result.ok(articleService.listArticles(page, size, status, categoryId, tagId, keyword, sort));
     }
 
     // ---- Status transitions ----
@@ -120,8 +121,9 @@ public class ArticleController {
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long tagId,
-            @RequestParam(required = false) String keyword) {
-        return Result.ok(articleService.listPublishedArticles(page, size, categoryId, tagId, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String sort) {
+        return Result.ok(articleService.listPublishedArticles(page, size, categoryId, tagId, keyword, sort));
     }
 
     @GetMapping("/api/articles/{id}")

@@ -41,7 +41,11 @@ export function recordVisit(data: any) {
 }
 
 export function likeArticle(id: number) {
-  return request.post(`/api/articles/${id}/like`)
+  return request.post(`/api/public/article/${id}/like`)
+}
+
+export function getLikeStatus(id: number) {
+  return request.get(`/api/public/article/${id}/like/status`)
 }
 
 export function subscribe(data: { email: string; name?: string; source?: string; tags?: string }) {

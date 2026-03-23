@@ -174,6 +174,13 @@ public class AuthServiceImpl implements AuthService {
         }
         user.setPassword(null); // Don't expose password
         user.setTwoFactorSecret(null); // Don't expose 2FA secret
+
+        // Attach roles & permissions so frontend sidebar works after page refresh
+        List<String> userRoles = sysUserMapper.selectRoleKeysByUserId(userId);
+        List<String> userPermissions = sysUserMapper.selectPermissionCodesByUserId(userId);
+        user.setRoles(userRoles);
+        user.setPermissions(userPermissions);
+
         return user;
     }
 

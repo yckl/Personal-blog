@@ -40,10 +40,10 @@ public class HomepageController {
 
         // --- Hero config ---
         Map<String, String> hero = new LinkedHashMap<>();
-        hero.put("badge", siteInfo.getOrDefault("hero_badge", "✨ Personal Blog"));
-        hero.put("title", siteInfo.getOrDefault("hero_title", "Thoughts, Stories & Ideas Worth Sharing"));
-        hero.put("subtitle", siteInfo.getOrDefault("hero_subtitle", "Exploring technology, creativity, and the art of building things that matter."));
-        hero.put("ctaText", siteInfo.getOrDefault("hero_cta_text", "Read Articles →"));
+        hero.put("badge", siteInfo.getOrDefault("hero_badge", "✨ 个人博客"));
+        hero.put("title", siteInfo.getOrDefault("hero_title", "思考、技术与值得分享的想法"));
+        hero.put("subtitle", siteInfo.getOrDefault("hero_subtitle", "关注技术、产品、设计与长期主义，记录构建有价值事物的旅程。"));
+        hero.put("ctaText", siteInfo.getOrDefault("hero_cta_text", "阅读文章 →"));
         hero.put("ctaLink", siteInfo.getOrDefault("hero_cta_link", "/articles"));
         result.put("hero", hero);
 

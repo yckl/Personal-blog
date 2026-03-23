@@ -27,6 +27,40 @@ public class PaymentController {
     private final MembershipPlanMapper planMapper;
 
     /**
+     * Public: list available payment methods (mock data).
+     */
+    @GetMapping("/api/payment/methods")
+    public Result<List<Map<String, Object>>> getPaymentMethods() {
+        List<Map<String, Object>> methods = new ArrayList<>();
+
+        Map<String, Object> stripe = new LinkedHashMap<>();
+        stripe.put("id", 1);
+        stripe.put("name", "Stripe (信用卡/借记卡)");
+        stripe.put("iconUrl", "/files/icons/stripe.svg");
+        stripe.put("typeCode", "STRIPE");
+        stripe.put("enabled", true);
+        methods.add(stripe);
+
+        Map<String, Object> wechat = new LinkedHashMap<>();
+        wechat.put("id", 2);
+        wechat.put("name", "微信支付");
+        wechat.put("iconUrl", "/files/icons/wechat-pay.svg");
+        wechat.put("typeCode", "WECHAT_PAY");
+        wechat.put("enabled", true);
+        methods.add(wechat);
+
+        Map<String, Object> alipay = new LinkedHashMap<>();
+        alipay.put("id", 3);
+        alipay.put("name", "支付宝");
+        alipay.put("iconUrl", "/files/icons/alipay.svg");
+        alipay.put("typeCode", "ALIPAY");
+        alipay.put("enabled", true);
+        methods.add(alipay);
+
+        return Result.ok(methods);
+    }
+
+    /**
      * Create a payment order for a membership plan.
      */
     @PostMapping("/api/member/payment/create")

@@ -18,8 +18,10 @@ const router = createRouter({
         { path: 'archive', name: 'ArchivePage', component: () => import('../views/ArchivePage.vue') },
         { path: 'about', name: 'AboutPage', component: () => import('../views/AboutPage.vue') },
         { path: 'contact', name: 'ContactPage', component: () => import('../views/ContactPage.vue') },
+        { path: 'products', name: 'ProductsPage', component: () => import('../views/ProductsPage.vue') },
         { path: 'subscribe/confirm', name: 'SubscribeConfirm', component: () => import('../views/SubscribeConfirm.vue') },
         { path: 'unsubscribe', name: 'Unsubscribe', component: () => import('../views/UnsubscribePage.vue') },
+        { path: 'member', name: 'MemberDashboard', component: () => import('../views/MemberDashboard.vue') },
         { path: ':pathMatch(.*)*', name: 'NotFound', component: () => import('../views/NotFoundPage.vue') },
       ]
     }

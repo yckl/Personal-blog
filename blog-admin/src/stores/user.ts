@@ -61,6 +61,9 @@ export const useUserStore = defineStore('user', () => {
   async function fetchUser() {
     const res: any = await getCurrentUser()
     userInfo.value = res.data
+    // Populate roles & permissions so sidebar visibility works after page refresh
+    if (res.data?.roles) roles.value = res.data.roles
+    if (res.data?.permissions) permissions.value = res.data.permissions
   }
 
   async function logout() {

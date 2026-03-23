@@ -1,108 +1,118 @@
 <template>
   <div class="article-list">
     <!-- Toolbar -->
-    <div class="toolbar">
+    <div class="toolbar glass-admin">
       <div class="toolbar-left">
-        <el-input v-model="keyword" placeholder="Search articles..." clearable style="width: 220px" @clear="loadData" @keyup.enter="loadData">
+        <el-input v-model="keyword" placeholder="搜索文章..." clearable style="width: 220px" @clear="loadData" @keyup.enter="loadData">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-select v-model="statusFilter" placeholder="Status" clearable style="width: 140px" @change="loadData">
-          <el-option label="Draft" value="DRAFT" />
-          <el-option label="Published" value="PUBLISHED" />
-          <el-option label="Scheduled" value="SCHEDULED" />
-          <el-option label="Archived" value="ARCHIVED" />
-          <el-option label="Private" value="PRIVATE" />
-          <el-option label="Members Only" value="MEMBER_ONLY" />
+        <el-select v-model="statusFilter" placeholder="状态" clearable style="width: 140px" @change="loadData">
+          <el-option label="草稿" value="DRAFT" />
+          <el-option label="已发布" value="PUBLISHED" />
+          <el-option label="定时发布" value="SCHEDULED" />
+          <el-option label="已归档" value="ARCHIVED" />
+          <el-option label="私密" value="PRIVATE" />
+          <el-option label="仅会员" value="MEMBER_ONLY" />
         </el-select>
-        <el-select v-model="categoryFilter" placeholder="Category" clearable style="width: 140px" @change="loadData">
+        <el-select v-model="categoryFilter" placeholder="分类" clearable style="width: 140px" @change="loadData">
           <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id" />
         </el-select>
-        <el-select v-model="tagFilter" placeholder="Tag" clearable style="width: 140px" @change="loadData">
+        <el-select v-model="tagFilter" placeholder="标签" clearable style="width: 140px" @change="loadData">
           <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id" />
         </el-select>
       </div>
       <el-button type="primary" @click="$router.push('/articles/create')">
-        <el-icon><Plus /></el-icon> New Article
+        <el-icon><Plus /></el-icon> 新建文章
       </el-button>
     </div>
 
-    <!-- Batch actions bar -->
+    <!-- Batch Bar -->
     <transition name="el-fade-in">
-      <div v-if="selectedIds.length > 0" class="batch-bar">
-        <span class="batch-count">{{ selectedIds.length }} selected</span>
+      <div v-if="selectedIds.length > 0" class="batch-bar glass-admin">
+        <span class="batch-count">已选 {{ selectedIds.length }} 篇</span>
         <el-button size="small" @click="handleBatch('publish')">
-          <el-icon><CircleCheckFilled /></el-icon> Publish
+          <el-icon><CircleCheckFilled /></el-icon> 发布
         </el-button>
         <el-button size="small" @click="handleBatch('unpublish')">
-          <el-icon><RemoveFilled /></el-icon> Unpublish
+          <el-icon><RemoveFilled /></el-icon> 取消发布
         </el-button>
         <el-button size="small" @click="handleBatch('top')">
-          <el-icon><Top /></el-icon> Pin to Top
+          <el-icon><Top /></el-icon> 置顶
         </el-button>
         <el-button size="small" @click="handleBatch('archive')">
-          <el-icon><FolderChecked /></el-icon> Archive
+          <el-icon><FolderChecked /></el-icon> 归档
         </el-button>
-        <el-popconfirm title="Delete selected articles?" @confirm="handleBatch('delete')">
+        <el-popconfirm title="确定删除选中的文章？" @confirm="handleBatch('delete')">
           <template #reference>
-            <el-button size="small" type="danger">
-              <el-icon><Delete /></el-icon> Delete
-            </el-button>
+            <el-button size="small" type="danger"><el-icon><Delete /></el-icon> 删除</el-button>
           </template>
         </el-popconfirm>
       </div>
     </transition>
 
-    <!-- Table -->
-    <el-table :data="articles" stripe v-loading="loading" style="width: 100%" @selection-change="handleSelectionChange" row-key="id">
-      <el-table-column type="selection" width="45" />
-      <el-table-column prop="title" label="Title" min-width="280">
-        <template #default="{ row }">
-          <div class="title-cell">
-            <el-tag v-if="row.isTop" type="danger" size="small" effect="dark" style="margin-right: 6px;">TOP</el-tag>
-            <el-link type="primary" @click="$router.push(`/articles/edit/${row.id}`)">{{ row.title }}</el-link>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column prop="status" label="Status" width="110">
-        <template #default="{ row }">
-          <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="categoryName" label="Category" width="120" />
-      <el-table-column label="Tags" width="180">
-        <template #default="{ row }">
-          <el-tag v-for="tag in (row.tags || []).slice(0, 3)" :key="tag.id" :color="tag.color" size="small" style="margin-right: 4px; color: #fff;" effect="dark">
-            {{ tag.name }}
-          </el-tag>
-          <span v-if="(row.tags || []).length > 3" style="font-size: 12px; color: #999;">+{{ row.tags.length - 3 }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="viewCount" label="Views" width="80" sortable />
-      <el-table-column prop="commentCount" label="Comments" width="100" />
-      <el-table-column label="Published" width="170">
-        <template #default="{ row }">
-          {{ row.publishedAt ? formatTime(row.publishedAt) : '—' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="Actions" width="220" fixed="right">
-        <template #default="{ row }">
-          <el-button v-if="row.status !== 'PUBLISHED'" type="success" size="small" text @click="handlePublish(row.id)">Publish</el-button>
-          <el-button v-else type="warning" size="small" text @click="handleUnpublish(row.id)">Unpublish</el-button>
-          <el-button type="primary" size="small" text @click="$router.push(`/articles/edit/${row.id}`)">Edit</el-button>
-          <el-dropdown trigger="click" @command="(cmd: string) => handleRowAction(cmd, row)">
-            <el-button size="small" text><el-icon><MoreFilled /></el-icon></el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="top">{{ row.isTop ? 'Unpin' : 'Pin to Top' }}</el-dropdown-item>
-                <el-dropdown-item command="archive">Archive</el-dropdown-item>
-                <el-dropdown-item command="schedule">Schedule</el-dropdown-item>
-                <el-dropdown-item command="delete" divided style="color: #f56c6c;">Delete</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- ===== Glass Table ===== -->
+    <div class="table-wrap glass-admin">
+      <el-table :data="articles" v-loading="loading" style="width: 100%" row-key="id"
+                @selection-change="handleSelectionChange"
+                :header-cell-style="{ background: 'rgba(168,85,247,0.06)', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.05)', height: '52px' }"
+                :row-style="{ height: '72px' }"
+                :cell-style="{ borderBottom: '1px solid rgba(255,255,255,0.04)' }">
+        <el-table-column type="selection" width="40" />
+        <el-table-column prop="title" label="标题" min-width="200">
+          <template #default="{ row }">
+            <div class="title-cell">
+              <el-tag v-if="row.isTop" type="danger" size="small" effect="dark" style="margin-right: 6px; flex-shrink: 0;">TOP</el-tag>
+              <el-link type="primary" @click="$router.push(`/articles/edit/${row.id}`)" class="title-link">{{ row.title }}</el-link>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <span :class="['status-badge', row.status?.toLowerCase()]">
+              <span class="status-dot" />
+              {{ row.status }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="categoryName" label="分类" width="90" show-overflow-tooltip />
+        <el-table-column label="标签" width="140">
+          <template #default="{ row }">
+            <el-tag v-for="tag in (row.tags || []).slice(0, 2)" :key="tag.id" :color="tag.color" size="small" style="margin-right: 4px; color: #fff;" effect="dark">
+              {{ tag.name }}
+            </el-tag>
+            <span v-if="(row.tags || []).length > 2" style="font-size: 12px; color: #64748b;">+{{ row.tags.length - 2 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="viewCount" label="浏览" width="70" sortable />
+        <el-table-column prop="commentCount" label="评论" width="70" />
+        <el-table-column label="发布时间" width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.publishedAt ? formatTime(row.publishedAt) : '—' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <div class="action-btns">
+              <el-button type="primary" size="small" text @click="$router.push(`/articles/edit/${row.id}`)">编辑</el-button>
+              <el-button v-if="row.slug" type="info" size="small" text @click="previewArticle(row.slug)">预览</el-button>
+              <el-button v-if="row.status !== 'PUBLISHED'" type="success" size="small" text @click="handlePublish(row.id)">发布</el-button>
+              <el-button v-else type="warning" size="small" text @click="handleUnpublish(row.id)">取消发布</el-button>
+              <el-dropdown trigger="click" @command="(cmd: string) => handleRowAction(cmd, row)">
+                <el-button size="small" text><el-icon><MoreFilled /></el-icon></el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="top">{{ row.isTop ? '取消置顶' : '置顶' }}</el-dropdown-item>
+                    <el-dropdown-item command="archive">归档</el-dropdown-item>
+                    <el-dropdown-item command="schedule">定时发布</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided style="color: #f43f5e;">删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
     <!-- Pagination -->
     <el-pagination
@@ -116,16 +126,16 @@
       @size-change="loadData"
     />
 
-    <!-- Schedule Dialog -->
-    <el-dialog v-model="scheduleDialogVisible" title="Schedule Publication" width="420px">
+    <!-- 定时发布 Dialog -->
+    <el-dialog v-model="scheduleDialogVisible" title="定时发布 Publication" width="420px">
       <el-form>
         <el-form-item label="Publish at">
-          <el-date-picker v-model="scheduledTime" type="datetime" placeholder="Select date and time" style="width: 100%" />
+          <el-date-picker v-model="scheduledTime" type="datetime" placeholder="选择日期和时间" style="width: 100%" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="scheduleDialogVisible = false">Cancel</el-button>
-        <el-button type="primary" @click="confirmSchedule">Confirm</el-button>
+        <el-button @click="scheduleDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirm定时发布">Confirm</el-button>
       </template>
     </el-dialog>
   </div>
@@ -152,22 +162,14 @@ const tagFilter = ref<number | undefined>(undefined)
 const categories = ref<any[]>([])
 const tags = ref<any[]>([])
 const selectedIds = ref<number[]>([])
-
 const scheduleDialogVisible = ref(false)
 const scheduledTime = ref<Date | null>(null)
 const scheduleTargetId = ref<number | null>(null)
 
-function statusTagType(status: string) {
-  const map: Record<string, string> = {
-    PUBLISHED: 'success', DRAFT: 'info', SCHEDULED: 'warning',
-    ARCHIVED: 'danger', PRIVATE: '', MEMBER_ONLY: 'warning'
-  }
-  return map[status] || 'info'
-}
+function formatTime(t: string): string { return t ? t.replace('T', ' ').substring(0, 16) : '' }
 
-function formatTime(t: string): string {
-  if (!t) return ''
-  return t.replace('T', ' ').substring(0, 16)
+function previewArticle(slug: string) {
+  window.open(`/article/${slug}`, '_blank')
 }
 
 async function loadData() {
@@ -191,53 +193,32 @@ async function loadFilters() {
     const [catRes, tagRes]: any = await Promise.all([getCategories(), getTags()])
     categories.value = catRes.data || []
     tags.value = tagRes.data || []
-  } catch { /* ignore */ }
+  } catch {}
 }
 
-function handleSelectionChange(rows: any[]) {
-  selectedIds.value = rows.map((r: any) => r.id)
-}
-
-async function handlePublish(id: number) {
-  await publishArticle(id); ElMessage.success('Published'); loadData()
-}
-async function handleUnpublish(id: number) {
-  await unpublishArticle(id); ElMessage.success('Unpublished'); loadData()
-}
+function handleSelectionChange(rows: any[]) { selectedIds.value = rows.map((r: any) => r.id) }
+async function handlePublish(id: number) { await publishArticle(id); ElMessage.success('Published'); loadData() }
+async function handleUnpublish(id: number) { await unpublishArticle(id); ElMessage.success('已取消发布'); loadData() }
 
 async function handleRowAction(cmd: string, row: any) {
   if (cmd === 'delete') {
     await ElMessageBox.confirm('Delete this article?', 'Confirm')
-    await deleteArticle(row.id); ElMessage.success('Deleted'); loadData()
+    await deleteArticle(row.id); ElMessage.success('已删除'); loadData()
   } else if (cmd === 'top') {
-    // Toggle top status via batch (single item)
-    if (row.isTop) {
-      // Unpin — use batch with isTop=false (via unpublish-like update)
-      await batchTopArticles([row.id])
-      // Actually we need a separate "unpin" — for now we'll just toggle
-    }
     await batchTopArticles([row.id])
-    ElMessage.success(row.isTop ? 'Unpinned' : 'Pinned to top')
-    loadData()
+    ElMessage.success(row.isTop ? 'Unpinned' : 'Pinned to top'); loadData()
   } else if (cmd === 'archive') {
     await batchArchiveArticles([row.id]); ElMessage.success('Archived'); loadData()
   } else if (cmd === 'schedule') {
-    scheduleTargetId.value = row.id
-    scheduledTime.value = null
-    scheduleDialogVisible.value = true
+    scheduleTargetId.value = row.id; scheduledTime.value = null; scheduleDialogVisible.value = true
   }
 }
 
-async function confirmSchedule() {
-  if (!scheduledTime.value || !scheduleTargetId.value) {
-    ElMessage.warning('Please select a date and time')
-    return
-  }
+async function confirm定时发布() {
+  if (!scheduledTime.value || !scheduleTargetId.value) { ElMessage.warning('Please select a date and time'); return }
   const isoStr = scheduledTime.value.toISOString().substring(0, 19)
   await scheduleArticle(scheduleTargetId.value, { scheduledAt: isoStr })
-  ElMessage.success('Article scheduled')
-  scheduleDialogVisible.value = false
-  loadData()
+  ElMessage.success('Article scheduled'); scheduleDialogVisible.value = false; loadData()
 }
 
 async function handleBatch(action: string) {
@@ -249,8 +230,7 @@ async function handleBatch(action: string) {
     else if (action === 'archive') await batchArchiveArticles(ids)
     else if (action === 'publish') await batchPublishArticles(ids)
     else if (action === 'unpublish') await batchUnpublishArticles(ids)
-    ElMessage.success(`Batch ${action} successful`)
-    loadData()
+    ElMessage.success(`Batch ${action} successful`); loadData()
   } catch (e: any) { ElMessage.error(e.message) }
 }
 
@@ -258,39 +238,54 @@ onMounted(() => { loadData(); loadFilters() })
 </script>
 
 <style scoped>
-.article-list {
-  padding: 4px;
+.article-list { padding: 4px; }
+
+.glass-admin {
+  background: rgba(15,23,42,0.6);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(168,85,247,0.1);
+  border-radius: 16px;
+  padding: 20px;
 }
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 12px;
+
+/* Toolbar */
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+.toolbar-left { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Batch Bar */
+.batch-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.batch-count { font-size: 13px; font-weight: 600; color: #a855f7; margin-right: 8px; }
+
+/* Table */
+.table-wrap { padding: 0; overflow: hidden; }
+.title-cell { display: flex; align-items: center; min-width: 0; }
+.title-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Status Badge */
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
 }
-.toolbar-left {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.batch-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #ecf5ff;
-  border-radius: 8px;
-  margin-bottom: 16px;
-}
-.batch-count {
-  font-size: 13px;
-  font-weight: 600;
-  color: #409eff;
-  margin-right: 8px;
-}
-.title-cell {
-  display: flex;
-  align-items: center;
-}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; }
+.status-badge.published { background: rgba(16,185,129,0.1); color: #10b981; }
+.status-badge.published .status-dot { background: #10b981; }
+.status-badge.draft { background: rgba(148,163,184,0.1); color: #94a3b8; }
+.status-badge.draft .status-dot { background: #94a3b8; }
+.status-badge.scheduled { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.status-badge.scheduled .status-dot { background: #f59e0b; }
+.status-badge.archived { background: rgba(244,63,94,0.1); color: #f43f5e; }
+.status-badge.archived .status-dot { background: #f43f5e; }
+.status-badge.private { background: rgba(168,85,247,0.1); color: #a855f7; }
+.status-badge.private .status-dot { background: #a855f7; }
+.status-badge.member_only { background: rgba(34,211,238,0.1); color: #22d3ee; }
+.status-badge.member_only .status-dot { background: #22d3ee; }
+
+.action-btns { display: flex; gap: 2px; align-items: center; }
+
+/* Dark overrides for el-table */
+:deep(.el-table) { background: transparent; --el-table-bg-color: transparent; --el-table-tr-bg-color: transparent; --el-table-header-bg-color: transparent; --el-table-border-color: rgba(255,255,255,0.04); color: #94a3b8; }
+:deep(.el-table th) { background: rgba(168,85,247,0.04) !important; }
+:deep(.el-table td) { border-bottom-color: rgba(255,255,255,0.04) !important; }
+:deep(.el-table--enable-row-hover .el-table__body tr:hover > td) { background: rgba(168,85,247,0.04) !important; }
+:deep(.el-table .el-table__cell) { color: #94a3b8; }
 </style>

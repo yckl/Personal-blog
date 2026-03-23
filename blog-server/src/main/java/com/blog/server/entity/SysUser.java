@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @TableName("sys_user")
@@ -33,4 +34,11 @@ public class SysUser {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    /** Non-persistent: populated by service layer for API responses */
+    @TableField(exist = false)
+    private List<String> roles;
+
+    @TableField(exist = false)
+    private List<String> permissions;
 }

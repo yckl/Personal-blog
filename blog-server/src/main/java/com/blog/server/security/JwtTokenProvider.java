@@ -61,6 +61,22 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    // ---- Member Token ----
+
+    public String generateMemberToken(Long memberId, String email) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpiration);
+
+        return Jwts.builder()
+                .subject(String.valueOf(memberId))
+                .claim("email", email)
+                .claim("type", "member")
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
     // ---- Temp Token (for 2FA intermediate step) ----
 
     public String generateTempToken(Long userId, String username) {

@@ -79,7 +79,7 @@ jwt:
 
 # File Upload Path
 upload:
-  path: ./uploads
+  path: C:/Users/YCK/Desktop/Personal blog/blog-server/uploads
   url-prefix: /files
   allowed-types: jpg,jpeg,png,gif,webp,svg,mp4,webm,pdf,md
 
@@ -100,13 +100,13 @@ springdoc:
 
 # App settings
 app:
-  site-url: http://localhost:3000
+  site-url: http://127.0.0.1:5173
 
 # AI Service (OpenAI-compatible)
 ai:
-  api-url: https://api.openai.com/v1/chat/completions
-  api-key:       # Set your API key here or via env AI_API_KEY
-  model: gpt-3.5-turbo
+  api-url: https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+  api-key: ${GEMINI_API_KEY:}
+  model: gemini-2.5-flash
   max-input-length: 8000
 
 # I4: Actuator health & info

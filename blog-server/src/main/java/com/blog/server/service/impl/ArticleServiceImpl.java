@@ -183,18 +183,18 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     public PageResult<ArticleVO> listArticles(Integer page, Integer size, String status,
-                                               Long categoryId, Long tagId, String keyword) {
-        return doListArticles(page, size, status, categoryId, tagId, keyword);
+                                               Long categoryId, Long tagId, String keyword, String sort) {
+        return doListArticles(page, size, status, categoryId, tagId, keyword, sort);
     }
 
     @Override
     public PageResult<ArticleVO> listPublishedArticles(Integer page, Integer size,
-                                                        Long categoryId, Long tagId, String keyword) {
-        return doListArticles(page, size, "PUBLISHED", categoryId, tagId, keyword);
+                                                        Long categoryId, Long tagId, String keyword, String sort) {
+        return doListArticles(page, size, "PUBLISHED", categoryId, tagId, keyword, sort);
     }
 
     private PageResult<ArticleVO> doListArticles(Integer page, Integer size, String status,
-                                                  Long categoryId, Long tagId, String keyword) {
+                                                  Long categoryId, Long tagId, String keyword, String sort) {
         Page<Article> pageParam = new Page<>(page != null ? page : 1, size != null ? size : 10);
 
         LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<>();
@@ -220,7 +220,15 @@ public class ArticleServiceImpl implements ArticleService {
             wrapper.in(Article::getId, articleIds);
         }
 
-        wrapper.orderByDesc(Article::getIsTop).orderByDesc(Article::getCreatedAt);
+        // Apply sorting rules
+        if ("hot".equals(sort)) {
+            wrapper.orderByDesc(Article::getIsTop).orderByDesc(Article::getViewCount).orderByDesc(Article::getCreatedAt);
+        } else if ("recommended".equals(sort)) {
+            wrapper.orderByDesc(Article::getIsFeatured).orderByDesc(Article::getIsTop).orderByDesc(Article::getCreatedAt);
+        } else {
+            // Default "latest"
+            wrapper.orderByDesc(Article::getIsTop).orderByDesc(Article::getCreatedAt);
+        }
 
         Page<Article> result = articleMapper.selectPage(pageParam, wrapper);
 
@@ -414,10 +422,11 @@ public class ArticleServiceImpl implements ArticleService {
                 vo.setContentHtml(content.getContentHtml());
                 vo.setTocJson(content.getTocJson());
             }
-            // Reading time: ~200 words per minute
-            int wc = article.getWordCount() != null ? article.getWordCount() : 0;
-            vo.setReadingTime(Math.max(1, wc / 200));
         }
+
+        // Reading time: ~200 words per minute (always included)
+        int wc = article.getWordCount() != null ? article.getWordCount() : 0;
+        vo.setReadingTime(Math.max(1, wc / 200));
 
         return vo;
     }
