@@ -290,10 +290,11 @@ onMounted(async () => {
 
 .member-layout {
   display: grid; grid-template-columns: 280px 1fr; gap: 32px;
+  align-items: start;
 }
 
 /* ===== Sidebar ===== */
-.member-sidebar { padding: 32px 24px; border-radius: 20px; height: fit-content; position: sticky; top: 100px; }
+.member-sidebar { padding: 32px 24px; border-radius: 20px; position: sticky; top: 100px; }
 .sidebar-profile { text-align: center; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
 .avatar-ring-lg {
   width: 72px; height: 72px; margin: 0 auto 12px;
@@ -334,7 +335,7 @@ onMounted(async () => {
 .nav-divider { height: 1px; background: var(--border); margin: 8px 0; }
 
 /* ===== Main Content ===== */
-.member-main { min-height: 400px; }
+.member-main { min-height: 400px; min-width: 0; }
 .section-title {
   font-family: var(--font-heading); font-size: 28px; font-weight: 800;
   margin-bottom: 24px; letter-spacing: -0.02em;
