@@ -56,14 +56,6 @@
           <el-icon><Goods /></el-icon>
           <template #title>数字产品</template>
         </el-menu-item>
-        <el-menu-item v-if="isAdminUser" index="/seo">
-          <el-icon><Search /></el-icon>
-          <template #title>搜索引擎优化</template>
-        </el-menu-item>
-        <el-menu-item v-if="isAdminUser" index="/menus">
-          <el-icon><Menu /></el-icon>
-          <template #title>菜单管理</template>
-        </el-menu-item>
         <el-menu-item v-if="isAdminUser" index="/settings">
           <el-icon><Setting /></el-icon>
           <template #title>系统设置</template>

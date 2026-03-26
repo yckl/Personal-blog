@@ -92,6 +92,7 @@ public class MembershipController {
         result.put("avatar", member.getAvatar());
         result.put("tier", currentTier);
         result.put("tierExpiresAt", member.getTierExpiresAt());
+        result.put("currentPlanId", member.getCurrentPlanId());
         // Generate real JWT token for member
         result.put("token", jwtTokenProvider.generateMemberToken(member.getId(), member.getEmail()));
         return Result.ok(result);
@@ -112,6 +113,7 @@ public class MembershipController {
         result.put("avatar", member.getAvatar());
         result.put("tier", member.getTier());
         result.put("tierExpiresAt", member.getTierExpiresAt());
+        result.put("currentPlanId", member.getCurrentPlanId());
         result.put("createdAt", member.getCreatedAt());
         return Result.ok(result);
     }
@@ -261,7 +263,8 @@ public class MembershipController {
         memberMapper.update(null, new LambdaUpdateWrapper<Member>()
                 .eq(Member::getId, member.getId())
                 .set(Member::getTier, plan.getTier())
-                .set(Member::getTierExpiresAt, newExpiry));
+                .set(Member::getTierExpiresAt, newExpiry)
+                .set(Member::getCurrentPlanId, plan.getId()));
 
         // Return updated info
         Map<String, Object> result = new LinkedHashMap<>();
@@ -271,6 +274,7 @@ public class MembershipController {
         result.put("avatar", member.getAvatar());
         result.put("tier", plan.getTier());
         result.put("tierExpiresAt", newExpiry);
+        result.put("currentPlanId", plan.getId());
         result.put("orderNo", order.getOrderNo());
         return Result.ok(result);
     }

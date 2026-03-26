@@ -16,6 +16,7 @@ public class Member {
     private String avatar;
     private String tier;            // FREE, PREMIUM
     private LocalDateTime tierExpiresAt;
+    private Long currentPlanId;     // tracks the specific plan purchased
     private String status;          // ACTIVE, SUSPENDED, DELETED
     private String loginProvider;   // email, google, github
     private String providerId;

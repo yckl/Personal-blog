@@ -21,7 +21,15 @@ const router = createRouter({
         { path: 'products', name: 'ProductsPage', component: () => import('../views/ProductsPage.vue') },
         { path: 'subscribe/confirm', name: 'SubscribeConfirm', component: () => import('../views/SubscribeConfirm.vue') },
         { path: 'unsubscribe', name: 'Unsubscribe', component: () => import('../views/UnsubscribePage.vue') },
-        { path: 'member', name: 'MemberDashboard', component: () => import('../views/MemberDashboard.vue') },
+        { path: 'member', component: () => import('../layouts/UserCenterLayout.vue'),
+          children: [
+            { path: '', redirect: '/member/profile' },
+            { path: 'profile', name: 'UserProfile', component: () => import('../views/member/UserProfile.vue') },
+            { path: 'plans', name: 'UserPlans', component: () => import('../views/member/UserPlans.vue') },
+            { path: 'orders', name: 'UserOrders', component: () => import('../views/member/UserOrders.vue') },
+            { path: 'assets', name: 'UserAssets', component: () => import('../views/member/UserAssets.vue') },
+          ]
+        },
         { path: ':pathMatch(.*)*', name: 'NotFound', component: () => import('../views/NotFoundPage.vue') },
       ]
     }

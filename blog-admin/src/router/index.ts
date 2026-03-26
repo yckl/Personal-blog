@@ -92,18 +92,6 @@ const router = createRouter({
           meta: { roles: ['SUPER_ADMIN', 'ADMIN', 'EDITOR'] }
         },
         {
-          path: 'seo',
-          name: '搜索引擎优化',
-          component: () => import('../views/settings/SeoSettings.vue'),
-          meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
-        },
-        {
-          path: 'menus',
-          name: '菜单管理',
-          component: () => import('../views/settings/MenuSettings.vue'),
-          meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
-        },
-        {
           path: 'users',
           name: '用户管理',
           component: () => import('../views/settings/UserList.vue'),

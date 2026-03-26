@@ -103,7 +103,7 @@ public class DigitalProductController {
         purchase.setOrderNo(orderNo);
         purchase.setAmountCents(product.getPriceCents());
         purchase.setCurrency(product.getCurrency());
-        purchase.setStatus(product.getPriceCents() == 0 ? "PAID" : "PENDING");
+        purchase.setStatus("PAID"); // Mock mode: directly mark as paid
         purchase.setDownloadToken(token);
         purchase.setDownloadCount(0);
         purchase.setMaxDownloads(5);

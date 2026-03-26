@@ -290,11 +290,11 @@ onMounted(async () => {
 
 .member-layout {
   display: grid; grid-template-columns: 280px 1fr; gap: 32px;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* ===== Sidebar ===== */
-.member-sidebar { padding: 32px 24px; border-radius: 20px; position: sticky; top: 100px; }
+.member-sidebar { padding: 32px 24px; border-radius: 20px; position: sticky; top: 100px; align-self: start; }
 .sidebar-profile { text-align: center; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
 .avatar-ring-lg {
   width: 72px; height: 72px; margin: 0 auto 12px;
@@ -335,14 +335,15 @@ onMounted(async () => {
 .nav-divider { height: 1px; background: var(--border); margin: 8px 0; }
 
 /* ===== Main Content ===== */
-.member-main { min-height: 400px; min-width: 0; }
+.member-main { min-height: 400px; min-width: 0; display: flex; flex-direction: column; }
+.tab-content { flex: 1; display: flex; flex-direction: column; }
 .section-title {
   font-family: var(--font-heading); font-size: 28px; font-weight: 800;
   margin-bottom: 24px; letter-spacing: -0.02em;
 }
 
 /* Profile */
-.profile-card { padding: 28px; border-radius: 16px; }
+.profile-card { padding: 28px; border-radius: 16px; flex: 1; }
 .profile-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 16px 0; border-bottom: 1px solid var(--border);

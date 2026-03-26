@@ -9,6 +9,7 @@ export interface MemberInfo {
   avatar: string | null
   tier: string
   tierExpiresAt: string | null
+  currentPlanId: number | null
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -41,7 +42,8 @@ export const useAuthStore = defineStore('auth', () => {
       nickname: data.nickname,
       avatar: data.avatar,
       tier: data.tier,
-      tierExpiresAt: data.tierExpiresAt
+      tierExpiresAt: data.tierExpiresAt,
+      currentPlanId: data.currentPlanId ?? null
     }
     localStorage.setItem('member_token', data.token)
     localStorage.setItem('member_user', JSON.stringify(user.value))
@@ -72,7 +74,8 @@ export const useAuthStore = defineStore('auth', () => {
         nickname: data.nickname,
         avatar: data.avatar,
         tier: data.tier,
-        tierExpiresAt: data.tierExpiresAt
+        tierExpiresAt: data.tierExpiresAt,
+        currentPlanId: data.currentPlanId ?? null
       }
       localStorage.setItem('member_user', JSON.stringify(user.value))
     } catch {
