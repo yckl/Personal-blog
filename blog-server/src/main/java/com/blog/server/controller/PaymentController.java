@@ -207,6 +207,7 @@ public class PaymentController {
 
     // ============ Internal ============
 
+    @org.springframework.transaction.annotation.Transactional
     private void completePayment(String orderNo, String provider, String providerOrderId) {
         PaymentOrder order = orderMapper.selectOne(
                 new LambdaQueryWrapper<PaymentOrder>().eq(PaymentOrder::getOrderNo, orderNo));

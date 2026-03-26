@@ -71,6 +71,6 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<?> handleException(Exception e) {
         log.error("Unexpected error", e);
-        return Result.fail(500, "Internal server error");
+        return Result.fail(500, "Internal server error: " + e.getMessage());
     }
 }

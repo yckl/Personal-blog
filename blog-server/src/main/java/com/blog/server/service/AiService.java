@@ -7,6 +7,7 @@ public interface AiService {
 
     /** Generate a summary/excerpt */
     String generateSummary(String content, Long articleId, Long userId);
+    String generateAbstract(String content, Long articleId, Long userId);
 
     /** Generate an SEO-optimized title */
     String generateSeoTitle(String content, String currentTitle, Long articleId, Long userId);

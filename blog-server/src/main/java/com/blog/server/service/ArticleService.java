@@ -46,4 +46,15 @@ public interface ArticleService {
 
     /** Called by the scheduler to publish articles whose scheduled time has arrived */
     void publishScheduledArticles();
+
+    // ---- Recycle bin ----
+
+    /** List soft-deleted articles (recycle bin) */
+    PageResult<ArticleVO> listDeletedArticles(Integer page, Integer size);
+
+    /** Restore a soft-deleted article */
+    void restoreArticle(Long id);
+
+    /** Permanently delete an article (hard delete, bypasses @TableLogic) */
+    void permanentDeleteArticle(Long id);
 }

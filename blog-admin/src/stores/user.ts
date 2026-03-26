@@ -62,8 +62,14 @@ export const useUserStore = defineStore('user', () => {
     const res: any = await getCurrentUser()
     userInfo.value = res.data
     // Populate roles & permissions so sidebar visibility works after page refresh
-    if (res.data?.roles) roles.value = res.data.roles
-    if (res.data?.permissions) permissions.value = res.data.permissions
+    if (res.data?.roles) {
+      roles.value = res.data.roles
+      localStorage.setItem('roles', JSON.stringify(res.data.roles))
+    }
+    if (res.data?.permissions) {
+      permissions.value = res.data.permissions
+      localStorage.setItem('permissions', JSON.stringify(res.data.permissions))
+    }
   }
 
   async function logout() {
@@ -97,6 +103,8 @@ export const useUserStore = defineStore('user', () => {
     permissions.value = data.permissions || []
     localStorage.setItem('token', data.token)
     localStorage.setItem('refreshToken', data.refreshToken)
+    localStorage.setItem('roles', JSON.stringify(roles.value))
+    localStorage.setItem('permissions', JSON.stringify(permissions.value))
   }
 
   function clearAuth() {
@@ -109,6 +117,8 @@ export const useUserStore = defineStore('user', () => {
     requireTwoFactor.value = false
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
+    localStorage.removeItem('roles')
+    localStorage.removeItem('permissions')
   }
 
   return {

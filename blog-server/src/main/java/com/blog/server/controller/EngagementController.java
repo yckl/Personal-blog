@@ -2,11 +2,14 @@ package com.blog.server.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.blog.server.common.IpUtils;
 import com.blog.server.common.Result;
 import com.blog.server.entity.*;
+import com.blog.server.exception.BusinessException;
 import com.blog.server.mapper.*;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -29,12 +32,15 @@ public class EngagementController {
     // ============ LIKE ============
 
     /**
-     * Like an article (IP-based dedup via DB unique key).
+     * Like/unlike an article (IP-based dedup).
+     * Uses insert-first pattern to avoid race conditions.
      */
     @PostMapping("/article/{id}/like")
+    @Transactional
     public Result<Map<String, Object>> likeArticle(@PathVariable Long id,
                                                     HttpServletRequest request) {
-        String ip = getClientIp(request);
+        assertArticleExists(id);
+        String ip = IpUtils.getClientIp(request);
 
         // Check if already liked
         Long existing = likeMapper.selectCount(
@@ -54,7 +60,7 @@ public class EngagementController {
             return Result.ok(Map.of("liked", false, "likeCount", article != null ? article.getLikeCount() : 0));
         }
 
-        // Like
+        // Like — try insert first, handle unique key violation
         try {
             ArticleLike like = new ArticleLike();
             like.setArticleId(id);
@@ -64,7 +70,9 @@ public class EngagementController {
                     new LambdaUpdateWrapper<Article>()
                             .eq(Article::getId, id)
                             .setSql("like_count = like_count + 1"));
-        } catch (Exception ignored) {} // unique key violation
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // Already liked (concurrent request) — skip count increment
+        }
 
         Article article = articleMapper.selectById(id);
         return Result.ok(Map.of("liked", true, "likeCount", article != null ? article.getLikeCount() : 0));
@@ -76,7 +84,7 @@ public class EngagementController {
     @GetMapping("/article/{id}/like/status")
     public Result<Map<String, Object>> getLikeStatus(@PathVariable Long id,
                                                       HttpServletRequest request) {
-        String ip = getClientIp(request);
+        String ip = IpUtils.getClientIp(request);
         Long count = likeMapper.selectCount(
                 new LambdaQueryWrapper<ArticleLike>()
                         .eq(ArticleLike::getArticleId, id)
@@ -91,14 +99,13 @@ public class EngagementController {
 
     /**
      * Toggle favorite (device-id based since no user auth required).
-     * Uses a device fingerprint stored in header.
      */
     @PostMapping("/article/{id}/favorite")
     public Result<Map<String, Object>> toggleFavorite(@PathVariable Long id,
                                                        @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
                                                        HttpServletRequest request) {
-        // Use device ID or fall back to IP
-        long userId = deviceId != null ? Math.abs(deviceId.hashCode()) : Math.abs(getClientIp(request).hashCode());
+        assertArticleExists(id);
+        long userId = deviceId != null ? Math.abs(deviceId.hashCode()) : Math.abs(IpUtils.getClientIp(request).hashCode());
 
         Long existing = favoriteMapper.selectCount(
                 new LambdaQueryWrapper<ArticleFavorite>()
@@ -128,7 +135,7 @@ public class EngagementController {
     public Result<Map<String, Object>> getFavoriteStatus(@PathVariable Long id,
                                                           @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
                                                           HttpServletRequest request) {
-        long userId = deviceId != null ? Math.abs(deviceId.hashCode()) : Math.abs(getClientIp(request).hashCode());
+        long userId = deviceId != null ? Math.abs(deviceId.hashCode()) : Math.abs(IpUtils.getClientIp(request).hashCode());
         Long count = favoriteMapper.selectCount(
                 new LambdaQueryWrapper<ArticleFavorite>()
                         .eq(ArticleFavorite::getArticleId, id)
@@ -143,7 +150,7 @@ public class EngagementController {
     public Result<List<Map<String, Object>>> getFavorites(
             @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
             HttpServletRequest request) {
-        long userId = deviceId != null ? Math.abs(deviceId.hashCode()) : Math.abs(getClientIp(request).hashCode());
+        long userId = deviceId != null ? Math.abs(deviceId.hashCode()) : Math.abs(IpUtils.getClientIp(request).hashCode());
         List<ArticleFavorite> favs = favoriteMapper.selectList(
                 new LambdaQueryWrapper<ArticleFavorite>()
                         .eq(ArticleFavorite::getUserId, userId)
@@ -176,10 +183,11 @@ public class EngagementController {
     public Result<Void> trackShare(@PathVariable Long id,
                                     @RequestParam String platform,
                                     HttpServletRequest request) {
+        assertArticleExists(id);
         ArticleShare share = new ArticleShare();
         share.setArticleId(id);
         share.setPlatform(platform);
-        share.setIpAddress(getClientIp(request));
+        share.setIpAddress(IpUtils.getClientIp(request));
         shareMapper.insert(share);
         return Result.ok(null);
     }
@@ -196,17 +204,11 @@ public class EngagementController {
         return Result.ok(counts);
     }
 
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
+    // ============ Helpers ============
+
+    private void assertArticleExists(Long id) {
+        if (articleMapper.selectCount(new LambdaQueryWrapper<Article>().eq(Article::getId, id)) == 0) {
+            throw new BusinessException(404, "Article not found");
         }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip != null ? ip : "unknown";
     }
 }

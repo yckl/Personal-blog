@@ -70,7 +70,7 @@
           <template #default="{ row }">
             <span :class="['status-badge', row.status?.toLowerCase()]">
               <span class="status-dot" />
-              {{ row.status }}
+              {{ statusMap[row.status] || row.status }}
             </span>
           </template>
         </el-table-column>
@@ -127,15 +127,15 @@
     />
 
     <!-- 定时发布 Dialog -->
-    <el-dialog v-model="scheduleDialogVisible" title="定时发布 Publication" width="420px">
+    <el-dialog v-model="scheduleDialogVisible" title="定时发布" width="420px">
       <el-form>
-        <el-form-item label="Publish at">
+        <el-form-item label="发布时间">
           <el-date-picker v-model="scheduledTime" type="datetime" placeholder="选择日期和时间" style="width: 100%" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="scheduleDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirm定时发布">Confirm</el-button>
+        <el-button type="primary" @click="confirmSchedule">确认</el-button>
       </template>
     </el-dialog>
   </div>
@@ -149,6 +149,8 @@ import {
 } from '../../api/article'
 import { getCategories, getTags } from '../../api/modules'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+const statusMap: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '已发布', SCHEDULED: '定时发布', ARCHIVED: '已归档', PRIVATE: '私密', MEMBER_ONLY: '仅会员' }
 
 const articles = ref<any[]>([])
 const loading = ref(false)
@@ -197,28 +199,28 @@ async function loadFilters() {
 }
 
 function handleSelectionChange(rows: any[]) { selectedIds.value = rows.map((r: any) => r.id) }
-async function handlePublish(id: number) { await publishArticle(id); ElMessage.success('Published'); loadData() }
+async function handlePublish(id: number) { await publishArticle(id); ElMessage.success('已发布'); loadData() }
 async function handleUnpublish(id: number) { await unpublishArticle(id); ElMessage.success('已取消发布'); loadData() }
 
 async function handleRowAction(cmd: string, row: any) {
   if (cmd === 'delete') {
-    await ElMessageBox.confirm('Delete this article?', 'Confirm')
+    await ElMessageBox.confirm('确认删除这篇文章吗？', '提示')
     await deleteArticle(row.id); ElMessage.success('已删除'); loadData()
   } else if (cmd === 'top') {
     await batchTopArticles([row.id])
-    ElMessage.success(row.isTop ? 'Unpinned' : 'Pinned to top'); loadData()
+    ElMessage.success(row.isTop ? '已取消置顶' : '已置顶'); loadData()
   } else if (cmd === 'archive') {
-    await batchArchiveArticles([row.id]); ElMessage.success('Archived'); loadData()
+    await batchArchiveArticles([row.id]); ElMessage.success('已归档'); loadData()
   } else if (cmd === 'schedule') {
     scheduleTargetId.value = row.id; scheduledTime.value = null; scheduleDialogVisible.value = true
   }
 }
 
-async function confirm定时发布() {
-  if (!scheduledTime.value || !scheduleTargetId.value) { ElMessage.warning('Please select a date and time'); return }
+async function confirmSchedule() {
+  if (!scheduledTime.value || !scheduleTargetId.value) { ElMessage.warning('请选择日期和时间'); return }
   const isoStr = scheduledTime.value.toISOString().substring(0, 19)
   await scheduleArticle(scheduleTargetId.value, { scheduledAt: isoStr })
-  ElMessage.success('Article scheduled'); scheduleDialogVisible.value = false; loadData()
+  ElMessage.success('文章已定时发布'); scheduleDialogVisible.value = false; loadData()
 }
 
 async function handleBatch(action: string) {

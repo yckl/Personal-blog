@@ -71,7 +71,47 @@
           @click="page++; loadProducts()"
         >下一页</button>
       </div>
+
     </main>
+
+    <!-- Payment Modal -->
+    <Teleport to="body">
+      <Transition name="pay-modal">
+        <div v-if="showPaymentModal" class="pay-overlay" @click.self="showPaymentModal = false">
+          <div class="pay-dialog">
+            <!-- Header -->
+            <div class="pay-header">
+              <h3>订单结算</h3>
+              <button class="pay-close" @click="showPaymentModal = false">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <div class="pay-body">
+              <p class="pay-product-name">{{ pendingProduct?.title }}</p>
+              <div class="pay-price">
+                <span class="pay-currency">¥</span>
+                <span class="pay-amount">{{ pendingProduct ? (pendingProduct.priceCents / 100).toFixed(2) : '0.00' }}</span>
+              </div>
+
+              <div class="pay-qr">
+                <img v-if="pendingProduct" :src="`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=mock_product_${pendingProduct.id}`" alt="支付二维码" />
+              </div>
+              <p class="pay-hint">测试环境 — 请使用任意扫码工具模拟支付</p>
+            </div>
+
+            <!-- Footer -->
+            <div class="pay-footer">
+              <button class="pay-btn cancel" @click="showPaymentModal = false">取消支付</button>
+              <button class="pay-btn confirm" @click="confirmPayment">已完成支付</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -118,6 +158,9 @@ async function loadProducts() {
   }
 }
 
+const showPaymentModal = ref(false)
+const pendingProduct = ref<any>(null)
+
 async function handlePurchase(product: any) {
   if (!authStore.isLoggedIn) {
     authStore.openLogin()
@@ -125,9 +168,8 @@ async function handlePurchase(product: any) {
   }
   
   if (product.priceCents === 0) {
-    // Free purchase logic
     try {
-      const res: any = await request.post(`/api/products/${product.id}/purchase`, {
+      await request.post(`/api/products/${product.id}/purchase`, {
         memberId: authStore.user?.id
       })
       alert('领取成功！数字产品将在您的会员中心展示或发送至您的邮箱。')
@@ -136,9 +178,15 @@ async function handlePurchase(product: any) {
       alert(e.message || '领取失败')
     }
   } else {
-    // Route to checkout / member center
-    alert('暂未开启在线支付功能。')
+    pendingProduct.value = product
+    showPaymentModal.value = true
   }
+}
+
+function confirmPayment() {
+  alert('🎉 模拟支付成功！数字资源已发放到您的资产库！')
+  showPaymentModal.value = false
+  setTimeout(() => router.push('/member'), 500)
 }
 
 onMounted(() => {
@@ -272,4 +320,119 @@ onMounted(() => {
   .filter-btn { padding: 8px 16px; font-size: 14px; }
   .products-grid { grid-template-columns: 1fr; gap: 24px; }
 }
+
+/* ===== Payment Modal (must be non-scoped for Teleport) ===== */
+</style>
+<style>
+.pay-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.pay-dialog {
+  width: 380px; max-width: 92vw;
+  background: var(--bg-card, #fff);
+  border-radius: 20px;
+  box-shadow: 0 32px 64px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08);
+  overflow: hidden;
+  animation: payIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes payIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Header */
+.pay-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border, rgba(0,0,0,0.06));
+}
+.pay-header h3 {
+  font-size: 17px; font-weight: 700;
+  color: var(--text-heading); margin: 0;
+  font-family: var(--font-heading);
+}
+.pay-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: var(--bg-hover, rgba(0,0,0,0.04));
+  color: var(--text-dim); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.pay-close:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
+
+/* Body */
+.pay-body {
+  padding: 24px; text-align: center;
+}
+.pay-product-name {
+  font-size: 14px; color: var(--text-dim);
+  margin-bottom: 8px; font-weight: 500;
+}
+.pay-price {
+  display: flex; align-items: baseline;
+  justify-content: center; gap: 2px;
+  margin-bottom: 24px;
+}
+.pay-currency {
+  font-size: 18px; font-weight: 700;
+  color: var(--text-heading);
+}
+.pay-amount {
+  font-size: 36px; font-weight: 800;
+  color: var(--text-heading);
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+}
+
+.pay-qr {
+  display: inline-flex; padding: 12px;
+  background: #fff; border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  margin-bottom: 16px;
+}
+.pay-qr img { width: 180px; height: 180px; border-radius: 8px; }
+
+.pay-hint {
+  font-size: 12px; color: var(--text-dim, #9ca3af);
+  margin: 0;
+}
+
+/* Footer */
+.pay-footer {
+  display: flex; gap: 12px;
+  padding: 16px 24px 24px;
+}
+.pay-btn {
+  flex: 1; padding: 12px 0;
+  border-radius: 12px; font-size: 15px;
+  font-weight: 700; cursor: pointer;
+  border: none; font-family: inherit;
+  transition: all 0.2s;
+}
+.pay-btn.cancel {
+  background: var(--bg-hover, rgba(0,0,0,0.04));
+  color: var(--text-muted);
+  border: 1px solid var(--border, rgba(0,0,0,0.08));
+}
+.pay-btn.cancel:hover { background: rgba(0,0,0,0.08); }
+.pay-btn.confirm {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(139,92,246,0.35);
+}
+.pay-btn.confirm:hover {
+  box-shadow: 0 6px 24px rgba(139,92,246,0.5);
+  transform: translateY(-1px);
+}
+
+/* Transition */
+.pay-modal-enter-active { transition: opacity 0.25s; }
+.pay-modal-leave-active { transition: opacity 0.2s; }
+.pay-modal-enter-from, .pay-modal-leave-to { opacity: 0; }
+.pay-modal-enter-from .pay-dialog { transform: scale(0.9); }
 </style>

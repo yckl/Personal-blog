@@ -6,19 +6,20 @@ import com.blog.server.dto.request.ArticleRequest;
 import com.blog.server.dto.request.BatchArticleRequest;
 import com.blog.server.dto.response.ArticleVO;
 import com.blog.server.entity.SysUser;
+import com.blog.server.service.AiService;
 import com.blog.server.service.ArticleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDateTime;
+import com.blog.server.annotation.RateLimit;
 
 @RestController
 @RequiredArgsConstructor
 public class ArticleController {
 
     private final ArticleService articleService;
+    private final AiService aiService;
 
     // ---- CRUD ----
 
@@ -60,21 +61,6 @@ public class ArticleController {
 
     // ---- Status transitions ----
 
-    @Deprecated
-    @PostMapping("/api/admin/article/publish-basic/{id}")
-    public Result<Void> publishArticle(@PathVariable Long id) {
-        articleService.publishArticle(id);
-        return Result.ok();
-    }
-
-    @Deprecated
-    @PostMapping("/api/admin/article/schedule-basic/{id}")
-    public Result<Void> scheduleArticle(@PathVariable Long id,
-                                        @RequestParam LocalDateTime scheduledAt) {
-        articleService.scheduleArticle(id, scheduledAt);
-        return Result.ok();
-    }
-
     @PutMapping("/api/admin/article/{id}/draft")
     public Result<Void> unpublishArticle(@PathVariable Long id) {
         articleService.unpublishArticle(id);
@@ -115,6 +101,7 @@ public class ArticleController {
 
     // ---- Public API (kept for frontend blog) ----
 
+    @RateLimit(maxRequests = 50, windowSeconds = 10)
     @GetMapping("/api/articles")
     public Result<PageResult<ArticleVO>> listPublicArticles(
             @RequestParam(defaultValue = "1") Integer page,
@@ -126,8 +113,46 @@ public class ArticleController {
         return Result.ok(articleService.listPublishedArticles(page, size, categoryId, tagId, keyword, sort));
     }
 
+    @RateLimit(maxRequests = 30, windowSeconds = 10)
     @GetMapping("/api/articles/{id}")
     public Result<ArticleVO> getPublicArticle(@PathVariable Long id) {
-        return Result.ok(articleService.getArticleById(id));
+        ArticleVO article = articleService.getArticleById(id);
+        // Ensure only published articles are accessible via public API
+        if (article == null || !"PUBLISHED".equals(article.getStatus())) {
+            throw new com.blog.server.exception.BusinessException(404, "Article not found");
+        }
+        return Result.ok(article);
+    }
+
+    @RateLimit(maxRequests = 20, windowSeconds = 60)
+    @GetMapping("/api/articles/{id}/ai-summary")
+    public Result<String> getArticleAiSummary(@PathVariable Long id) {
+        ArticleVO article = articleService.getArticleById(id);
+        if (article == null || !"PUBLISHED".equals(article.getStatus())) {
+            throw new com.blog.server.exception.BusinessException(404, "Article not found");
+        }
+        String summaryJson = aiService.generateAbstract(article.getContentMd(), id, null);
+        return Result.ok(summaryJson);
+    }
+
+    // ============ Recycle Bin ============
+
+    @GetMapping("/api/admin/article/trash")
+    public Result<com.blog.server.common.PageResult<ArticleVO>> listTrash(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer size) {
+        return Result.ok(articleService.listDeletedArticles(page, size));
+    }
+
+    @PostMapping("/api/admin/article/{id}/restore")
+    public Result<Void> restoreArticle(@PathVariable Long id) {
+        articleService.restoreArticle(id);
+        return Result.ok();
+    }
+
+    @DeleteMapping("/api/admin/article/{id}/permanent")
+    public Result<Void> permanentDelete(@PathVariable Long id) {
+        articleService.permanentDeleteArticle(id);
+        return Result.ok();
     }
 }

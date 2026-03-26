@@ -190,7 +190,13 @@ watch(() => route.params.slug, load)
 .empty-state { text-align: center; color: var(--text-dim); padding: 48px; font-size: 16px; }
 
 /* Responsive */
-@media (max-width: 1024px) { .articles-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); } }
-@media (max-width: 768px) { .articles-grid { grid-template-columns: 1fr; gap: 24px; } .page-title { font-size: 36px; } .tag-cloud-section { padding: 24px; } }
+@media (max-width: 1024px) {
+  .articles-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+}
+@media (max-width: 640px) {
+  .articles-grid { grid-template-columns: 1fr; gap: 24px; }
+  .page-title { font-size: 36px; }
+  .tag-cloud-section { padding: 24px; }
+}
 
 </style>

@@ -9,17 +9,40 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * I3: Simple in-memory rate limiter per IP.
- * Limits: 60 requests/minute for API, 10 requests/minute for auth endpoints.
+ * Simple in-memory rate limiter per IP.
+ * Limits: 30 requests/minute for auth endpoints, 120 requests/minute for other API endpoints.
+ * Stale entries are cleaned up every 5 minutes to prevent memory leaks.
  */
 @Component
 @Order(1)
 public class RateLimitFilter implements Filter {
 
     private final Map<String, RateInfo> rateLimits = new ConcurrentHashMap<>();
+    private ScheduledExecutorService cleanupExecutor;
+
+    @Override
+    public void init(FilterConfig filterConfig) {
+        // Schedule cleanup of stale entries every 5 minutes
+        cleanupExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "rate-limit-cleanup");
+            t.setDaemon(true);
+            return t;
+        });
+        cleanupExecutor.scheduleAtFixedRate(this::cleanupStaleEntries, 5, 5, TimeUnit.MINUTES);
+    }
+
+    @Override
+    public void destroy() {
+        if (cleanupExecutor != null) {
+            cleanupExecutor.shutdownNow();
+        }
+    }
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -54,6 +77,11 @@ public class RateLimitFilter implements Filter {
         }
 
         chain.doFilter(request, response);
+    }
+
+    private void cleanupStaleEntries() {
+        long now = System.currentTimeMillis();
+        rateLimits.entrySet().removeIf(entry -> now - entry.getValue().windowStart > 120_000);
     }
 
     private String getClientIp(HttpServletRequest request) {

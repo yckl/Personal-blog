@@ -8,7 +8,10 @@ import com.blog.server.service.ArticleService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.blog.server.mapper.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,6 +23,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class PublicController {
 
     private final ArticleService articleService;
@@ -31,6 +35,7 @@ public class PublicController {
     private final MenuConfigMapper menuConfigMapper;
     private final com.blog.server.service.ExperienceTimelineService timelineService;
     private final com.blog.server.service.ContactMessageService messageService;
+    private final StringRedisTemplate redisTemplate;
 
     // ---- Articles (public) ----
 
@@ -46,10 +51,17 @@ public class PublicController {
     }
 
     @GetMapping("/articles/{slug}")
-    public Result<ArticleVO> getArticleBySlug(@PathVariable String slug) {
+    public Result<ArticleVO> getArticleBySlug(@PathVariable String slug,
+                                               HttpServletRequest request) {
         ArticleVO vo = articleService.getArticleBySlug(slug);
-        // Increment view count
-        articleService.incrementViewCount(vo.getId());
+        // IP-based view count dedup (1 hour window)
+        String ip = com.blog.server.common.IpUtils.getClientIp(request);
+        String redisKey = "view:dedup:" + vo.getId() + ":" + ip;
+        Boolean isNew = redisTemplate.opsForValue().setIfAbsent(redisKey, "1",
+                java.time.Duration.ofHours(1));
+        if (Boolean.TRUE.equals(isNew)) {
+            articleService.incrementViewCount(vo.getId());
+        }
         return Result.ok(vo);
     }
 
@@ -95,7 +107,11 @@ public class PublicController {
     }
 
     @PostMapping("/messages")
-    public Result<Void> submitMessage(@RequestBody com.blog.server.entity.ContactMessage message) {
+    public Result<Void> submitMessage(@jakarta.validation.Valid @RequestBody com.blog.server.dto.request.ContactMessageRequest request) {
+        com.blog.server.entity.ContactMessage message = new com.blog.server.entity.ContactMessage();
+        message.setName(request.getName());
+        message.setEmail(request.getEmail());
+        message.setMessage(request.getMessage());
         messageService.submitMessage(message);
         return Result.ok(null);
     }

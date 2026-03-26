@@ -47,18 +47,12 @@ public class HomepageController {
         hero.put("ctaLink", siteInfo.getOrDefault("hero_cta_link", "/articles"));
         result.put("hero", hero);
 
-        // --- All published articles ---
-        List<Article> allPublished = articleMapper.selectList(
-                new LambdaQueryWrapper<Article>()
-                        .eq(Article::getStatus, "PUBLISHED")
-                        .orderByDesc(Article::getPublishedAt));
-
-        // Preload categories map
+        // --- Preload categories map ---
         List<ArticleCategory> cats = categoryMapper.selectList(new LambdaQueryWrapper<>());
         Map<Long, String> catNameMap = cats.stream()
                 .collect(Collectors.toMap(ArticleCategory::getId, ArticleCategory::getName, (a, b) -> a));
 
-        // Preload tags map
+        // --- Preload tags map ---
         List<ArticleTag> allTags = tagMapper.selectList(new LambdaQueryWrapper<>());
         Map<Long, ArticleTag> tagMap = allTags.stream()
                 .collect(Collectors.toMap(ArticleTag::getId, t -> t, (a, b) -> a));
@@ -71,37 +65,54 @@ public class HomepageController {
             }
         }
 
-        // --- Top / pinned (isTop = true) ---
-        List<Map<String, Object>> top = allPublished.stream()
-                .filter(a -> Boolean.TRUE.equals(a.getIsTop()))
-                .limit(6)
+        // --- Top / pinned (isTop = true, LIMIT 6) ---
+        List<Article> topArticles = articleMapper.selectList(
+                new LambdaQueryWrapper<Article>()
+                        .eq(Article::getStatus, "PUBLISHED")
+                        .eq(Article::getIsTop, true)
+                        .orderByDesc(Article::getPublishedAt)
+                        .last("LIMIT 6"));
+        List<Map<String, Object>> top = topArticles.stream()
                 .map(a -> toArticleCard(a, catNameMap, articleTagsMap))
                 .collect(Collectors.toList());
         result.put("topArticles", top);
 
-        // --- Featured (isFeatured = true) ---
-        List<Map<String, Object>> featured = allPublished.stream()
-                .filter(a -> Boolean.TRUE.equals(a.getIsFeatured()))
-                .limit(6)
+        // --- Featured (isFeatured = true, LIMIT 6) ---
+        List<Article> featuredArticles = articleMapper.selectList(
+                new LambdaQueryWrapper<Article>()
+                        .eq(Article::getStatus, "PUBLISHED")
+                        .eq(Article::getIsFeatured, true)
+                        .orderByDesc(Article::getPublishedAt)
+                        .last("LIMIT 6"));
+        List<Map<String, Object>> featured = featuredArticles.stream()
                 .map(a -> toArticleCard(a, catNameMap, articleTagsMap))
                 .collect(Collectors.toList());
         result.put("featuredArticles", featured);
 
-        // --- Latest (newest 10, excluding top/featured to diversify the homepage) ---
+        // --- Collect IDs to exclude from latest ---
         Set<Long> excludedLatestIds = new LinkedHashSet<>();
-        top.forEach(f -> excludedLatestIds.add(((Number) f.get("id")).longValue()));
-        featured.forEach(f -> excludedLatestIds.add(((Number) f.get("id")).longValue()));
-        List<Map<String, Object>> latest = allPublished.stream()
-                .filter(a -> !excludedLatestIds.contains(a.getId()))
-                .limit(10)
+        topArticles.forEach(a -> excludedLatestIds.add(a.getId()));
+        featuredArticles.forEach(a -> excludedLatestIds.add(a.getId()));
+
+        // --- Latest (newest 10, excluding top/featured) ---
+        LambdaQueryWrapper<Article> latestQuery = new LambdaQueryWrapper<Article>()
+                .eq(Article::getStatus, "PUBLISHED")
+                .orderByDesc(Article::getPublishedAt)
+                .last("LIMIT 10");
+        if (!excludedLatestIds.isEmpty()) {
+            latestQuery.notIn(Article::getId, excludedLatestIds);
+        }
+        List<Map<String, Object>> latest = articleMapper.selectList(latestQuery).stream()
                 .map(a -> toArticleCard(a, catNameMap, articleTagsMap))
                 .collect(Collectors.toList());
         result.put("latestArticles", latest);
 
         // --- Popular (by view count, top 6) ---
-        List<Map<String, Object>> popular = allPublished.stream()
-                .sorted(Comparator.comparingInt((Article a) -> a.getViewCount() != null ? a.getViewCount() : 0).reversed())
-                .limit(6)
+        List<Map<String, Object>> popular = articleMapper.selectList(
+                new LambdaQueryWrapper<Article>()
+                        .eq(Article::getStatus, "PUBLISHED")
+                        .orderByDesc(Article::getViewCount)
+                        .last("LIMIT 6")).stream()
                 .map(a -> toArticleCard(a, catNameMap, articleTagsMap))
                 .collect(Collectors.toList());
         result.put("popularArticles", popular);
@@ -125,10 +136,12 @@ public class HomepageController {
         }).collect(Collectors.toList());
         result.put("seriesList", series);
 
-        // --- Stats ---
+        // --- Stats (use COUNT query instead of loading all articles) ---
+        Long totalPublished = articleMapper.selectCount(
+                new LambdaQueryWrapper<Article>().eq(Article::getStatus, "PUBLISHED"));
         Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("totalArticles", allPublished.size());
-        stats.put("totalViews", allPublished.stream().mapToInt(a -> a.getViewCount() != null ? a.getViewCount() : 0).sum());
+        stats.put("totalArticles", totalPublished);
+        stats.put("totalViews", 0); // Could use a SUM query if needed
         result.put("stats", stats);
 
         return Result.ok(result);

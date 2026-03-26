@@ -107,7 +107,7 @@ const router = createRouter({
           path: 'users',
           name: '用户管理',
           component: () => import('../views/settings/UserList.vue'),
-          meta: { roles: ['SUPER_ADMIN'] }
+          meta: { roles: ['SUPER_ADMIN', 'ADMIN'] }
         },
         {
           path: 'messages',
@@ -157,8 +157,23 @@ router.beforeEach((to, _from, next) => {
   // Check role-based access
   const requiredRoles = to.meta.roles as string[] | undefined
   if (requiredRoles && requiredRoles.length > 0) {
-    // We rely on the store — if roles aren't loaded yet, AdminLayout will handle it
-    // For now, allow navigation; AdminLayout's onMounted will verify
+    const storedRoles = JSON.parse(localStorage.getItem('roles') || '[]') as string[]
+    const hasRole = requiredRoles.some(role => storedRoles.includes(role))
+    if (!hasRole) {
+      // Redirect to dashboard with insufficient permissions
+      next('/dashboard')
+      return
+    }
+  }
+
+  // Check permission-based access
+  const requiredPermission = to.meta.permission as string | undefined
+  if (requiredPermission) {
+    const storedPermissions = JSON.parse(localStorage.getItem('permissions') || '[]') as string[]
+    if (!storedPermissions.includes(requiredPermission)) {
+      next('/dashboard')
+      return
+    }
   }
 
   next()

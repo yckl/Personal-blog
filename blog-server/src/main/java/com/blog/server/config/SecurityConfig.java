@@ -28,9 +28,12 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            .cors(org.springframework.security.config.Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // Allow all CORS preflight requests
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Admin auth endpoints (public)
                 .requestMatchers(
                     "/api/admin/auth/login",
@@ -68,6 +71,7 @@ public class SecurityConfig {
                 // Member authenticated endpoints (require ROLE_MEMBER)
                 .requestMatchers("/api/member/*/profile", "/api/member/*/orders").hasRole("MEMBER")
                 .requestMatchers("/api/member/payment/**").hasRole("MEMBER")
+                .requestMatchers("/api/membership/upgrade").hasRole("MEMBER")
                 // Payment webhooks + public payment methods
                 .requestMatchers("/api/payment/webhook/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/payment/methods").permitAll()
@@ -81,8 +85,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/ab/**").permitAll()
                 // Multi-author public endpoints
                 .requestMatchers(HttpMethod.GET, "/api/public/articles/*/authors", "/api/public/authors/*/articles").permitAll()
-                // Actuator
-                .requestMatchers("/actuator/**").permitAll()
+                // Friend links
+                .requestMatchers(HttpMethod.GET, "/api/public/links").permitAll()
+                // Actuator (health check only — other endpoints require auth)
+                .requestMatchers("/actuator/health").permitAll()
                 // Swagger / OpenAPI
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 // Everything else requires authentication

@@ -41,8 +41,10 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public Result<Void> logout(@AuthenticationPrincipal SysUser user) {
-        authService.logout(user.getId());
+    public Result<Void> logout(@AuthenticationPrincipal SysUser user,
+                                HttpServletRequest httpRequest) {
+        String token = extractToken(httpRequest);
+        authService.logout(user.getId(), token);
         return Result.ok();
     }
 
@@ -70,5 +72,13 @@ public class AuthController {
             ip = ip.split(",")[0].trim();
         }
         return ip;
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
     }
 }

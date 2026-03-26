@@ -89,7 +89,7 @@
                 <li v-if="plan.tier === 'PREMIUM'">✓ 优先客服支持</li>
                 <li v-if="plan.tier === 'PREMIUM'">✓ 下载原始资源</li>
               </ul>
-              <button v-if="plan.tier !== authStore.user?.tier" class="btn btn-primary btn-glow plan-btn">
+              <button v-if="plan.tier !== authStore.user?.tier" class="btn btn-primary btn-glow plan-btn" @click="handleUpgrade(plan)">
                 升级到 {{ plan.name }}
               </button>
               <span v-else class="current-badge">当前计划</span>
@@ -150,6 +150,24 @@
         </section>
       </main>
     </div>
+
+    <!-- Mock Payment Modal (outside layout for proper overlay) -->
+    <Transition name="fade">
+      <div v-if="showPaymentModal" class="mock-modal-overlay" @click.self="showPaymentModal = false">
+        <div class="mock-modal-content glass-card">
+          <h3 class="modal-title gradient-text">扫码升级会员</h3>
+          <p class="modal-warn">测试环境 - 请勿真实扫码打款</p>
+          <div class="qr-box">
+            <img v-if="pendingPlan" :src="`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=mock_upgrade_${pendingPlan.id}_${pendingPlan.priceCents}`" alt="QR" />
+          </div>
+          <p class="modal-price">需支付: <strong>¥{{ pendingPlan ? (pendingPlan.priceCents / 100).toFixed(2) : '0.00' }}</strong></p>
+          <div class="modal-actions">
+            <button class="btn btn-outline" @click="showPaymentModal = false">取消支付</button>
+            <button class="btn btn-primary btn-glow" @click="confirmUpgrade">已完成支付</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -182,6 +200,41 @@ function statusLabel(s: string) {
 function handleLogout() {
   authStore.logout()
   router.push('/')
+}
+
+const showPaymentModal = ref(false)
+const pendingPlan = ref<any>(null)
+
+async function handleUpgrade(plan: any) {
+  if (!authStore.isLoggedIn) {
+    authStore.openLogin()
+    return
+  }
+  
+  if (plan.priceCents === 0) {
+    alert('您已是该计划会员')
+    return
+  }
+  
+  pendingPlan.value = plan
+  showPaymentModal.value = true
+}
+
+async function confirmUpgrade() {
+  showPaymentModal.value = false
+  try {
+    const res: any = await request.post('/api/membership/upgrade', { planId: pendingPlan.value.id })
+    const data = res.data
+    // Update local auth store immediately — no need to re-login
+    if (authStore.user && data) {
+      authStore.user.tier = data.tier
+      authStore.user.tierExpiresAt = data.tierExpiresAt
+      localStorage.setItem('member_user', JSON.stringify(authStore.user))
+    }
+    alert('🎉 升级成功！您已成为高级会员！')
+  } catch {
+    alert('升级失败，请稍后重试')
+  }
 }
 
 async function handleDownload(token: string) {

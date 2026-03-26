@@ -12,6 +12,7 @@ import com.blog.server.exception.BusinessException;
 import com.blog.server.mapper.ArticleMapper;
 import com.blog.server.mapper.CommentMapper;
 import com.blog.server.service.CommentService;
+import com.blog.server.service.MailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,10 +25,13 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class CommentServiceImpl implements CommentService {
 
     private final CommentMapper commentMapper;
     private final ArticleMapper articleMapper;
+    private final MailService mailService;
+    private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
     // ============ Spam filter: sensitive words (multi-language) ============
     private static final List<String> SPAM_PATTERNS = List.of(
@@ -75,6 +79,13 @@ public class CommentServiceImpl implements CommentService {
             throw new BusinessException("You are commenting too frequently. Please wait a few minutes.");
         }
 
+        // Idempotency Lock
+        String lockKey = "comment:lock:" + ipAddress + ":" + Math.abs(request.getContent().hashCode());
+        Boolean locked = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "1", java.time.Duration.ofSeconds(10));
+        if (Boolean.FALSE.equals(locked)) {
+            throw new BusinessException("Please do not submit the same comment repeatedly.");
+        }
+
         Comment comment = new Comment();
         comment.setArticleId(request.getArticleId());
         comment.setParentId(request.getParentId());
@@ -110,12 +121,22 @@ public class CommentServiceImpl implements CommentService {
 
         commentMapper.insert(comment);
 
-        // Update article comment count
-        articleMapper.update(null,
-                new LambdaUpdateWrapper<Article>()
-                        .eq(Article::getId, request.getArticleId())
-                        .setSql("comment_count = comment_count + 1")
-        );
+        // Note: comment_count is NOT incremented here because status is PENDING.
+        // It will be incremented when the comment is approved.
+
+        // Send async email notification to parent author if it's a reply
+        if (request.getParentId() != null) {
+            Comment parent = commentMapper.selectById(request.getParentId());
+            if (parent != null && StringUtils.hasText(parent.getAuthorEmail())) {
+                mailService.sendCommentReplyNotification(
+                        parent.getAuthorEmail(),
+                        parent.getAuthorName(),
+                        comment.getAuthorName(),
+                        article.getTitle(),
+                        article.getSlug()
+                );
+            }
+        }
 
         return comment.getId();
     }
@@ -134,7 +155,9 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public PageResult<CommentVO> listAllComments(Integer page, Integer size, String status, Long articleId) {
-        Page<Comment> pageParam = new Page<>(page != null ? page : 1, size != null ? size : 20);
+        int p = page != null ? page : 1;
+        int s = Math.min(size != null ? size : 20, 100); // Cap at 100
+        Page<Comment> pageParam = new Page<>(p, s);
 
         LambdaQueryWrapper<Comment> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(status)) {
@@ -155,7 +178,17 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
+    @Transactional
     public void approveComment(Long id) {
+        Comment comment = commentMapper.selectById(id);
+        if (comment == null) return;
+        // Only increment if not already APPROVED (avoid double-counting)
+        if (!"APPROVED".equals(comment.getStatus())) {
+            articleMapper.update(null,
+                    new LambdaUpdateWrapper<Article>()
+                            .eq(Article::getId, comment.getArticleId())
+                            .setSql("comment_count = comment_count + 1"));
+        }
         commentMapper.update(null,
                 new LambdaUpdateWrapper<Comment>()
                         .eq(Comment::getId, id)
@@ -164,7 +197,17 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
+    @Transactional
     public void rejectComment(Long id) {
+        Comment comment = commentMapper.selectById(id);
+        if (comment == null) return;
+        // Decrement count only if rejecting an APPROVED comment
+        if ("APPROVED".equals(comment.getStatus())) {
+            articleMapper.update(null,
+                    new LambdaUpdateWrapper<Article>()
+                            .eq(Article::getId, comment.getArticleId())
+                            .setSql("comment_count = GREATEST(comment_count - 1, 0)"));
+        }
         commentMapper.update(null,
                 new LambdaUpdateWrapper<Comment>()
                         .eq(Comment::getId, id)
@@ -173,7 +216,15 @@ public class CommentServiceImpl implements CommentService {
     }
 
     @Override
+    @Transactional
     public void deleteComment(Long id) {
+        Comment comment = commentMapper.selectById(id);
+        if (comment != null && "APPROVED".equals(comment.getStatus())) {
+            articleMapper.update(null,
+                    new LambdaUpdateWrapper<Article>()
+                            .eq(Article::getId, comment.getArticleId())
+                            .setSql("comment_count = GREATEST(comment_count - 1, 0)"));
+        }
         commentMapper.deleteById(id);
     }
 
@@ -185,6 +236,13 @@ public class CommentServiceImpl implements CommentService {
                 new LambdaUpdateWrapper<Comment>()
                         .eq(Comment::getId, id)
                         .setSql("like_count = like_count + 1"));
+    }
+
+    public void unlikeComment(Long id) {
+        commentMapper.update(null,
+                new LambdaUpdateWrapper<Comment>()
+                        .eq(Comment::getId, id)
+                        .setSql("like_count = GREATEST(like_count - 1, 0)"));
     }
 
     /**
@@ -216,29 +274,49 @@ public class CommentServiceImpl implements CommentService {
         return count != null && count >= RATE_LIMIT;
     }
 
-    // ============ Tree Building ============
+    // ============ Tree Building (2-level flatten like YouTube) ============
 
     private List<CommentVO> buildCommentTree(List<Comment> comments) {
-        Map<Long, CommentVO> voMap = comments.stream()
-                .collect(Collectors.toMap(Comment::getId, this::convertToVO,
+        // Build a map of all comments for quick lookup
+        Map<Long, Comment> rawMap = comments.stream()
+                .collect(Collectors.toMap(Comment::getId, c -> c,
                         (existing, replacement) -> existing, LinkedHashMap::new));
 
+        // Separate roots and replies
         List<CommentVO> roots = new ArrayList<>();
-        for (CommentVO vo : voMap.values()) {
-            if (vo.getParentId() == null) {
+        Map<Long, List<CommentVO>> replyMap = new LinkedHashMap<>(); // rootId -> flat replies
+
+        for (Comment c : comments) {
+            CommentVO vo = convertToVO(c);
+
+            if (c.getParentId() == null) {
+                // Root comment
                 roots.add(vo);
             } else {
-                CommentVO parent = voMap.get(vo.getParentId());
-                if (parent != null) {
-                    if (parent.getChildren() == null) {
-                        parent.setChildren(new ArrayList<>());
+                // Reply — flatten under root
+                Long rootId = c.getRootId() != null ? c.getRootId() : c.getParentId();
+                vo.setRootId(rootId);
+
+                // Populate @replyToUserName
+                if (c.getParentId() != null) {
+                    Comment parentComment = rawMap.get(c.getParentId());
+                    if (parentComment != null) {
+                        // Only show @mention if replying to a non-root comment
+                        // (replying directly to root is obvious from context)
+                        if (parentComment.getParentId() != null) {
+                            vo.setReplyToUserName(parentComment.getAuthorName());
+                        }
                     }
-                    parent.getChildren().add(vo);
-                } else {
-                    // Orphan reply — add as root
-                    roots.add(vo);
                 }
+
+                replyMap.computeIfAbsent(rootId, k -> new ArrayList<>()).add(vo);
             }
+        }
+
+        // Attach flat replies to their root
+        for (CommentVO root : roots) {
+            List<CommentVO> replies = replyMap.get(root.getId());
+            root.setChildren(replies != null ? replies : new ArrayList<>());
         }
 
         // Sort: pinned first, then by date
@@ -256,6 +334,7 @@ public class CommentServiceImpl implements CommentService {
         vo.setId(comment.getId());
         vo.setArticleId(comment.getArticleId());
         vo.setParentId(comment.getParentId());
+        vo.setRootId(comment.getRootId());
         vo.setAuthorName(comment.getAuthorName());
         vo.setAuthorEmail(comment.getAuthorEmail());
         vo.setAuthorUrl(comment.getAuthorUrl());

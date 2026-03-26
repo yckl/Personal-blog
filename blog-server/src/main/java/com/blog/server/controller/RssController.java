@@ -15,6 +15,7 @@ import java.util.List;
  * RSS 2.0 feed endpoint.
  */
 @RestController
+@RequestMapping("/api/public")
 @RequiredArgsConstructor
 public class RssController {
 
@@ -23,7 +24,7 @@ public class RssController {
     @Value("${app.site-url:http://localhost:3000}")
     private String siteUrl;
 
-    @GetMapping(value = "/rss.xml", produces = MediaType.APPLICATION_XML_VALUE)
+    @GetMapping(value = "/feed.xml", produces = MediaType.APPLICATION_XML_VALUE)
     public String rssFeed() {
         List<Article> articles = articleMapper.selectList(
                 new LambdaQueryWrapper<Article>()
@@ -45,8 +46,8 @@ public class RssController {
         for (Article a : articles) {
             sb.append("  <item>\n");
             sb.append("    <title><![CDATA[").append(a.getTitle()).append("]]></title>\n");
-            sb.append("    <link>").append(siteUrl).append("/article/").append(a.getId()).append("</link>\n");
-            sb.append("    <guid>").append(siteUrl).append("/article/").append(a.getId()).append("</guid>\n");
+            sb.append("    <link>").append(siteUrl).append("/article/").append(a.getSlug()).append("</link>\n");
+            sb.append("    <guid>").append(siteUrl).append("/article/").append(a.getSlug()).append("</guid>\n");
             if (a.getExcerpt() != null) {
                 sb.append("    <description><![CDATA[").append(a.getExcerpt()).append("]]></description>\n");
             }

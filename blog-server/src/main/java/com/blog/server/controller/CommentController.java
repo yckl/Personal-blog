@@ -23,7 +23,7 @@ public class CommentController {
     @PostMapping("/api/comments")
     public Result<Long> createComment(@Valid @RequestBody CommentRequest request,
                                       HttpServletRequest httpRequest) {
-        String ip = getClientIp(httpRequest);
+        String ip = com.blog.server.common.IpUtils.getClientIp(httpRequest);
         String ua = httpRequest.getHeader("User-Agent");
         return Result.ok(commentService.createComment(request, ip, ua));
     }
@@ -36,6 +36,12 @@ public class CommentController {
     @PostMapping("/api/comments/{id}/like")
     public Result<Void> likeComment(@PathVariable Long id) {
         commentService.likeComment(id);
+        return Result.ok();
+    }
+
+    @PostMapping("/api/comments/{id}/unlike")
+    public Result<Void> unlikeComment(@PathVariable Long id) {
+        commentService.unlikeComment(id);
         return Result.ok();
     }
 
@@ -72,19 +78,5 @@ public class CommentController {
     public Result<Void> deleteComment(@PathVariable Long id) {
         commentService.deleteComment(id);
         return Result.ok();
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
     }
 }

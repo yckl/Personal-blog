@@ -171,8 +171,10 @@ function clearAllFilters() {
   onSearch()
 }
 
+let currentRequestId = 0
+
 async function loadData(append = false) {
-  if (loading.value) return
+  const reqId = ++currentRequestId
   loading.value = true
   try {
     const params: any = { page: page.value, size: 12, sort: sortBy.value }
@@ -180,6 +182,8 @@ async function loadData(append = false) {
     if (searchKeyword.value.trim()) params.keyword = searchKeyword.value.trim()
     
     const r: any = await getArticles(params)
+    if (reqId !== currentRequestId) return // Prevent race conditions
+    
     const newArticles = r.data?.records || []
     if (append) {
       articles.value.push(...newArticles)
@@ -188,8 +192,11 @@ async function loadData(append = false) {
     }
     totalPages.value = r.data?.pages || 1
     totalCount.value = r.data?.total || 0
-  } catch (e) { console.error(e) }
-  finally { loading.value = false }
+  } catch (e) { 
+    if (reqId === currentRequestId) console.error(e) 
+  } finally { 
+    if (reqId === currentRequestId) loading.value = false 
+  }
 }
 
 // Infinite scroll

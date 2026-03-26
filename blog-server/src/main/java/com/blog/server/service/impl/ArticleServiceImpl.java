@@ -12,6 +12,8 @@ import com.blog.server.mapper.*;
 import com.blog.server.service.ArticleService;
 import com.blog.server.service.EditorService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -19,10 +21,12 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ArticleServiceImpl implements ArticleService {
 
     private final ArticleMapper articleMapper;
@@ -34,18 +38,24 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleSeriesRelMapper seriesRelMapper;
     private final SysUserMapper userMapper;
     private final EditorService editorService;
+    private final com.blog.server.mapper.ArticleHistoryMapper articleHistoryMapper;
 
     @Override
     @Transactional
+    @CacheEvict(value = "public_articles", allEntries = true)
     public Long createArticle(ArticleRequest request, Long authorId) {
+        // Validate status
+        String status = request.getStatus() != null ? request.getStatus() : "DRAFT";
+        validateStatus(status);
+
         Article article = new Article();
         article.setTitle(request.getTitle());
-        article.setSlug(generateSlug(request.getSlug(), request.getTitle()));
+        article.setSlug(generateUniqueSlug(request.getSlug(), request.getTitle(), null));
         article.setExcerpt(request.getExcerpt());
         article.setCoverImage(request.getCoverImage());
         article.setAuthorId(authorId);
         article.setCategoryId(request.getCategoryId());
-        article.setStatus(request.getStatus() != null ? request.getStatus() : "DRAFT");
+        article.setStatus(status);
         article.setIsTop(request.getIsTop() != null ? request.getIsTop() : false);
         article.setIsFeatured(request.getIsFeatured() != null ? request.getIsFeatured() : false);
         article.setAllowComment(request.getAllowComment() != null ? request.getAllowComment() : true);
@@ -54,9 +64,9 @@ public class ArticleServiceImpl implements ArticleService {
         article.setCommentCount(0);
         article.setWordCount(countWords(request.getContentMd()));
 
-        if ("PUBLISHED".equals(article.getStatus())) {
+        if ("PUBLISHED".equals(status)) {
             article.setPublishedAt(LocalDateTime.now());
-        } else if ("SCHEDULED".equals(article.getStatus()) && request.getScheduledAt() != null) {
+        } else if ("SCHEDULED".equals(status) && request.getScheduledAt() != null) {
             article.setScheduledAt(request.getScheduledAt());
         }
 
@@ -94,6 +104,7 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void updateArticle(Long id, ArticleRequest request) {
         Article article = articleMapper.selectById(id);
         if (article == null) {
@@ -102,7 +113,8 @@ public class ArticleServiceImpl implements ArticleService {
 
         article.setTitle(request.getTitle());
         if (StringUtils.hasText(request.getSlug())) {
-            article.setSlug(request.getSlug());
+            // Validate slug uniqueness (excluding current article)
+            article.setSlug(generateUniqueSlug(request.getSlug(), null, id));
         }
         article.setExcerpt(request.getExcerpt());
         article.setCoverImage(request.getCoverImage());
@@ -113,8 +125,13 @@ public class ArticleServiceImpl implements ArticleService {
         article.setWordCount(countWords(request.getContentMd()));
 
         if (request.getStatus() != null) {
+            validateStatus(request.getStatus());
             if ("PUBLISHED".equals(request.getStatus()) && !"PUBLISHED".equals(article.getStatus())) {
                 article.setPublishedAt(LocalDateTime.now());
+            }
+            // Clear scheduledAt when transitioning away from SCHEDULED
+            if (!"SCHEDULED".equals(request.getStatus())) {
+                article.setScheduledAt(null);
             }
             article.setStatus(request.getStatus());
         }
@@ -126,6 +143,17 @@ public class ArticleServiceImpl implements ArticleService {
                 new LambdaQueryWrapper<ArticleContent>().eq(ArticleContent::getArticleId, id)
         );
         if (content != null) {
+            String oldContent = content.getContentMd() != null ? content.getContentMd() : "";
+            String newContent = request.getContentMd() != null ? request.getContentMd() : "";
+            if (!oldContent.equals(newContent)) {
+                com.blog.server.entity.ArticleHistory history = new com.blog.server.entity.ArticleHistory();
+                history.setArticleId(id);
+                history.setTitle(request.getTitle() != null ? request.getTitle() : article.getTitle());
+                history.setContentMd(newContent);
+                history.setVersionHash(org.springframework.util.DigestUtils.md5DigestAsHex(newContent.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                articleHistoryMapper.insert(history);
+            }
+
             content.setContentMd(request.getContentMd());
             content.setContentHtml(request.getContentHtml());
             try {
@@ -155,6 +183,7 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void deleteArticle(Long id) {
         articleMapper.deleteById(id);
     }
@@ -169,11 +198,13 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
+    @Cacheable(value = "public_articles", key = "'slug_' + #slug")
     public ArticleVO getArticleBySlug(String slug) {
         Article article = articleMapper.selectOne(
                 new LambdaQueryWrapper<Article>()
                         .eq(Article::getSlug, slug)
                         .eq(Article::getStatus, "PUBLISHED")
+                        .last("LIMIT 1")
         );
         if (article == null) {
             throw new BusinessException(404, "Article not found");
@@ -188,6 +219,7 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
+    @Cacheable(value = "public_articles", key = "'list_' + (#page ?: 1) + '_' + (#size ?: 10) + '_' + (#categoryId ?: 0) + '_' + (#tagId ?: 0) + '_' + (#keyword ?: '') + '_' + (#sort ?: '')")
     public PageResult<ArticleVO> listPublishedArticles(Integer page, Integer size,
                                                         Long categoryId, Long tagId, String keyword, String sort) {
         return doListArticles(page, size, "PUBLISHED", categoryId, tagId, keyword, sort);
@@ -195,7 +227,9 @@ public class ArticleServiceImpl implements ArticleService {
 
     private PageResult<ArticleVO> doListArticles(Integer page, Integer size, String status,
                                                   Long categoryId, Long tagId, String keyword, String sort) {
-        Page<Article> pageParam = new Page<>(page != null ? page : 1, size != null ? size : 10);
+        int p = page != null ? page : 1;
+        int s = Math.min(size != null ? size : 10, 100); // Cap at 100
+        Page<Article> pageParam = new Page<>(p, s);
 
         LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(status)) {
@@ -205,7 +239,9 @@ public class ArticleServiceImpl implements ArticleService {
             wrapper.eq(Article::getCategoryId, categoryId);
         }
         if (StringUtils.hasText(keyword)) {
-            wrapper.and(w -> w.like(Article::getTitle, keyword).or().like(Article::getExcerpt, keyword));
+            // Split-character fuzzy matching: e.g. "Spr" -> "%S%p%r%"
+            String fuzzyKeyword = "%" + String.join("%", keyword.split("")) + "%";
+            wrapper.and(w -> w.like(Article::getTitle, fuzzyKeyword).or().like(Article::getExcerpt, fuzzyKeyword));
         }
 
         // If filtering by tag, get article IDs first
@@ -240,6 +276,7 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void publishArticle(Long id) {
         articleMapper.update(null,
                 new LambdaUpdateWrapper<Article>()
@@ -250,6 +287,7 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void unpublishArticle(Long id) {
         articleMapper.update(null,
                 new LambdaUpdateWrapper<Article>()
@@ -271,16 +309,20 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void batchDelete(List<Long> ids) {
         if (ids != null && !ids.isEmpty()) {
+            if (ids.size() > 100) throw new BusinessException(400, "Batch operations limited to 100 items");
             articleMapper.deleteBatchIds(ids);
         }
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void batchSetTop(List<Long> ids, boolean isTop) {
         if (ids != null && !ids.isEmpty()) {
+            if (ids.size() > 100) throw new BusinessException(400, "Batch operations limited to 100 items");
             articleMapper.update(null,
                     new LambdaUpdateWrapper<Article>()
                             .in(Article::getId, ids)
@@ -291,8 +333,10 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void batchArchive(List<Long> ids) {
         if (ids != null && !ids.isEmpty()) {
+            if (ids.size() > 100) throw new BusinessException(400, "Batch operations limited to 100 items");
             articleMapper.update(null,
                     new LambdaUpdateWrapper<Article>()
                             .in(Article::getId, ids)
@@ -303,8 +347,10 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void batchPublish(List<Long> ids) {
         if (ids != null && !ids.isEmpty()) {
+            if (ids.size() > 100) throw new BusinessException(400, "Batch operations limited to 100 items");
             articleMapper.update(null,
                     new LambdaUpdateWrapper<Article>()
                             .in(Article::getId, ids)
@@ -316,8 +362,10 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void batchUnpublish(List<Long> ids) {
         if (ids != null && !ids.isEmpty()) {
+            if (ids.size() > 100) throw new BusinessException(400, "Batch operations limited to 100 items");
             articleMapper.update(null,
                     new LambdaUpdateWrapper<Article>()
                             .in(Article::getId, ids)
@@ -344,6 +392,7 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "public_articles", allEntries = true)
     public void publishScheduledArticles() {
         List<Article> scheduled = articleMapper.selectList(
                 new LambdaQueryWrapper<Article>()
@@ -353,6 +402,7 @@ public class ArticleServiceImpl implements ArticleService {
         for (Article article : scheduled) {
             article.setStatus("PUBLISHED");
             article.setPublishedAt(LocalDateTime.now());
+            article.setScheduledAt(null);  // Clear scheduled time
             articleMapper.updateById(article);
         }
     }
@@ -415,7 +465,9 @@ public class ArticleServiceImpl implements ArticleService {
         // Content (detail view only)
         if (includeContent) {
             ArticleContent content = articleContentMapper.selectOne(
-                    new LambdaQueryWrapper<ArticleContent>().eq(ArticleContent::getArticleId, article.getId())
+                    new LambdaQueryWrapper<ArticleContent>()
+                            .eq(ArticleContent::getArticleId, article.getId())
+                            .last("LIMIT 1")
             );
             if (content != null) {
                 vo.setContentMd(content.getContentMd());
@@ -456,15 +508,51 @@ public class ArticleServiceImpl implements ArticleService {
         versionMapper.insert(version);
     }
 
-    private String generateSlug(String slug, String title) {
-        if (StringUtils.hasText(slug)) {
-            return slug;
+    private static final Set<String> VALID_STATUSES = Set.of(
+            "DRAFT", "PUBLISHED", "SCHEDULED", "ARCHIVED");
+
+    private void validateStatus(String status) {
+        if (!VALID_STATUSES.contains(status)) {
+            throw new BusinessException(400, "Invalid article status: " + status
+                    + ". Must be one of: " + String.join(", ", VALID_STATUSES));
         }
-        // Simple slug generation from title
-        return title.toLowerCase()
-                .replaceAll("[^a-z0-9\\u4e00-\\u9fa5]+", "-")
-                .replaceAll("^-|-$", "")
-                + "-" + System.currentTimeMillis() % 10000;
+    }
+
+    /**
+     * Generate a unique slug. If the desired slug already exists (for a different article),
+     * append a numeric suffix.
+     * @param slug explicit slug from user (may be null)
+     * @param title article title (used to generate slug if slug is null)
+     * @param excludeId article ID to exclude from uniqueness check (for updates), may be null
+     */
+    private String generateUniqueSlug(String slug, String title, Long excludeId) {
+        String base;
+        if (StringUtils.hasText(slug)) {
+            base = slug;
+        } else {
+            base = title.toLowerCase()
+                    .replaceAll("[^a-z0-9\\u4e00-\\u9fa5]+", "-")
+                    .replaceAll("^-|-$", "");
+        }
+
+        String candidate = base;
+        int suffix = 1;
+        while (true) {
+            LambdaQueryWrapper<Article> check = new LambdaQueryWrapper<Article>()
+                    .eq(Article::getSlug, candidate);
+            if (excludeId != null) {
+                check.ne(Article::getId, excludeId);
+            }
+            if (articleMapper.selectCount(check) == 0) {
+                return candidate;
+            }
+            candidate = base + "-" + suffix;
+            suffix++;
+            if (suffix > 100) {
+                // Safety: prevent infinite loop
+                return base + "-" + System.currentTimeMillis();
+            }
+        }
     }
 
     private int countWords(String content) {
@@ -474,5 +562,56 @@ public class ArticleServiceImpl implements ArticleService {
         int chineseCount = cleaned.replaceAll("[^\\u4e00-\\u9fa5]", "").length();
         int englishWords = cleaned.replaceAll("[\\u4e00-\\u9fa5]", "").trim().split("\\s+").length;
         return chineseCount + englishWords;
+    }
+
+    // ---- Recycle Bin ----
+
+    @Override
+    public PageResult<ArticleVO> listDeletedArticles(Integer page, Integer size) {
+        // MyBatis-Plus @TableLogic filters deleted=1 by default, so we use a raw wrapper
+        int p = page != null ? page : 1;
+        int s = size != null ? size : 20;
+        Page<Article> pageParam = new Page<>(p, s);
+
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<Article>()
+                .apply("deleted = 1")  // bypass @TableLogic
+                .orderByDesc(Article::getUpdatedAt);
+
+        Page<Article> result = articleMapper.selectPage(pageParam, wrapper);
+        List<ArticleVO> records = result.getRecords().stream()
+                .map(a -> convertToVO(a, false))
+                .collect(Collectors.toList());
+        return new PageResult<>(records, result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    @Override
+    @Transactional
+    public void restoreArticle(Long id) {
+        // Bypass @TableLogic — directly set deleted = 0
+        articleMapper.update(null,
+                new LambdaUpdateWrapper<Article>()
+                        .apply("deleted = 1")
+                        .eq(Article::getId, id)
+                        .set(Article::getDeleted, 0)
+                        .set(Article::getStatus, "DRAFT"));
+    }
+
+    @Override
+    @Transactional
+    public void permanentDeleteArticle(Long id) {
+        // Hard delete — remove article and all related records
+        articleContentMapper.delete(
+                new LambdaQueryWrapper<ArticleContent>().eq(ArticleContent::getArticleId, id));
+        tagRelMapper.delete(
+                new LambdaQueryWrapper<ArticleTagRel>().eq(ArticleTagRel::getArticleId, id));
+        seriesRelMapper.delete(
+                new LambdaQueryWrapper<ArticleSeriesRel>().eq(ArticleSeriesRel::getArticleId, id));
+        versionMapper.delete(
+                new LambdaQueryWrapper<ArticleVersion>().eq(ArticleVersion::getArticleId, id));
+        // Hard delete the article itself (bypass @TableLogic)
+        articleMapper.delete(
+                new LambdaQueryWrapper<Article>()
+                        .apply("deleted = 1")
+                        .eq(Article::getId, id));
     }
 }

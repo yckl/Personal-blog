@@ -1,63 +1,174 @@
 <template>
-  <section class="comment-section">
-    <h2>💬 Comments <span v-if="comments.length" class="count">({{ totalCount }})</span></h2>
-
-    <!-- Sort -->
-    <div class="sort-bar" v-if="comments.length">
-      <button :class="{ active: sortBy === 'newest' }" @click="sortBy = 'newest'">Newest</button>
-      <button :class="{ active: sortBy === 'oldest' }" @click="sortBy = 'oldest'">Oldest</button>
-      <button :class="{ active: sortBy === 'popular' }" @click="sortBy = 'popular'">Most Liked</button>
+  <section class="yt-comments">
+    <!-- Header -->
+    <div class="yt-comments-header">
+      <h2>{{ totalCount }} 条评论</h2>
+      <div class="yt-sort" v-if="comments.length">
+        <button v-for="s in sortOptions" :key="s.key"
+          :class="{ active: sortBy === s.key }" @click="sortBy = s.key">
+          {{ s.label }}
+        </button>
+      </div>
     </div>
 
-    <!-- Comment Form -->
-    <div class="comment-form-card">
-      <h3>Leave a Comment</h3>
-      <form @submit.prevent="submitComment(null)">
-        <div class="form-row">
-          <input v-model="form.authorName" placeholder="Name *" required />
-          <input v-model="form.authorEmail" placeholder="Email" type="email" />
+    <!-- Post Comment (top-level) -->
+    <div class="yt-post-box">
+      <div class="yt-post-avatar">
+        <span class="yt-avatar-fallback" style="background: #6366f1">
+          {{ form.authorName ? form.authorName.charAt(0).toUpperCase() : '?' }}
+        </span>
+      </div>
+      <div class="yt-post-form" :class="{ focused: formFocused }">
+        <div class="yt-post-inputs" v-show="formFocused">
+          <input v-model="form.authorName" placeholder="你的名字 *" maxlength="30" />
+          <input v-model="form.authorEmail" placeholder="邮箱（选填，用于 Gravatar 头像）" type="email" maxlength="100" />
         </div>
-        <textarea v-model="form.content" placeholder="Share your thoughts..." rows="4" required />
-        <div class="form-actions">
-          <span v-if="submitError" class="error-msg">{{ submitError }}</span>
-          <span v-if="submitSuccess" class="success-msg">✅ Comment submitted! Awaiting review.</span>
-          <button type="submit" class="btn btn-primary" :disabled="submitting">
-            {{ submitting ? 'Submitting...' : '💬 Post Comment' }}
-          </button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Comment Tree -->
-    <div class="comments-list">
-      <div v-for="c in sortedComments" :key="c.id" class="comment-thread">
-        <CommentItem :comment="c" :articleId="articleId"
-          @reply="openReply" @like="likeComment" />
-        <!-- Replies -->
-        <div class="replies" v-if="c.children && c.children.length">
-          <CommentItem v-for="reply in c.children" :key="reply.id"
-            :comment="reply" :articleId="articleId" :isReply="true"
-            @reply="openReply" @like="likeComment" />
-        </div>
-        <!-- Reply Form -->
-        <div v-if="replyingTo === c.id" class="reply-form">
-          <form @submit.prevent="submitComment(c.id)">
-            <textarea v-model="replyContent" :placeholder="`Reply to ${c.authorName}...`" rows="3" required />
-            <div class="form-actions">
-              <button type="button" class="btn btn-ghost" @click="replyingTo = null">Cancel</button>
-              <button type="submit" class="btn btn-primary btn-sm" :disabled="submitting">Reply</button>
-            </div>
-          </form>
+        <textarea
+          ref="mainTextarea"
+          v-model="form.content"
+          placeholder="添加评论..."
+          rows="1"
+          @focus="formFocused = true"
+          @input="autoResize($event)"
+        />
+        <div class="yt-post-actions" v-show="formFocused">
+          <span v-if="submitError" class="yt-error">{{ submitError }}</span>
+          <span v-if="submitSuccess" class="yt-success">✅ 评论已提交，等待审核</span>
+          <div class="yt-post-btns">
+            <button class="yt-btn cancel" @click="cancelMainForm">取消</button>
+            <button class="yt-btn submit" :disabled="!canSubmitMain || submitting" @click="submitComment(null)">
+              {{ submitting ? '提交中...' : '评论' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <p v-if="!comments.length && !loading" class="empty-comments">No comments yet. Be the first to share your thoughts!</p>
+    <!-- Comment List -->
+    <div class="yt-list">
+      <div v-for="c in sortedComments" :key="c.id" class="yt-thread">
+        <!-- Root comment -->
+        <CommentItem :comment="c" :articleId="articleId" :likedIds="likedIds"
+          @reply="openReply" @like="likeComment" />
+
+        <!-- Reply toggle button + guide line container -->
+        <div class="yt-replies-zone" v-if="c.children && c.children.length"
+             :class="{ 'is-expanded': expandedThreads[c.id], 'is-hovering': hoveringToggle === c.id }">
+
+          <!-- Vertical guide stem (::before on this container) -->
+          <button class="yt-toggle-btn"
+            @click="toggleReplies(c)"
+            @mouseenter="hoveringToggle = c.id"
+            @mouseleave="hoveringToggle = null">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path v-if="!expandedThreads[c.id]" d="M7 10l5 5 5-5z"/>
+              <path v-else d="M7 14l5-5 5 5z"/>
+            </svg>
+            {{ expandedThreads[c.id] ? '隐藏回复' : `${c.children.length} 条回复` }}
+          </button>
+
+          <!-- Expanded replies (PC: inline, Mobile: BottomSheet) -->
+          <Transition name="yt-expand">
+            <div v-if="expandedThreads[c.id] && !isMobile" class="yt-replies-list">
+              <div v-for="(reply, idx) in c.children" :key="reply.id"
+                   class="yt-reply-wrapper"
+                   :class="{ 'is-last': idx === c.children.length - 1 }">
+                <CommentItem :comment="reply" :articleId="articleId" :isReply="true" :likedIds="likedIds"
+                  @reply="openReply" @like="likeComment" />
+              </div>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- Inline reply form -->
+        <div v-if="replyingTo?.rootId === c.id || (replyingTo?.id === c.id && !c.parentId)"
+             class="yt-reply-form-wrapper">
+          <div class="yt-reply-form">
+            <div class="yt-post-avatar small">
+              <span class="yt-avatar-fallback small" style="background: #8b5cf6">
+                {{ form.authorName ? form.authorName.charAt(0).toUpperCase() : '?' }}
+              </span>
+            </div>
+            <div class="yt-post-form focused">
+              <textarea
+                ref="replyTextarea"
+                v-model="replyContent"
+                :placeholder="`回复 @${replyingTo?.authorName}...`"
+                rows="1"
+                @input="autoResize($event)"
+              />
+              <div class="yt-post-actions">
+                <div class="yt-post-btns">
+                  <button class="yt-btn cancel" @click="replyingTo = null; replyContent = ''">取消</button>
+                  <button class="yt-btn submit" :disabled="!replyContent.trim() || submitting"
+                    @click="submitComment(replyingTo!.id)">
+                    回复
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div v-if="!comments.length && !loading" class="yt-empty">
+      <div class="yt-empty-icon">💬</div>
+      <p>还没有评论，来发表第一条吧！</p>
+    </div>
+
+    <!-- Mobile BottomSheet -->
+    <Teleport to="body">
+      <Transition name="yt-sheet">
+        <div v-if="sheetThread && isMobile" class="yt-sheet-overlay" @click.self="sheetThread = null">
+          <div class="yt-sheet" ref="sheetRef">
+            <div class="yt-sheet-handle" />
+            <div class="yt-sheet-header">
+              <h3>回复</h3>
+              <button class="yt-sheet-close" @click="sheetThread = null">✕</button>
+            </div>
+            <div class="yt-sheet-body">
+              <!-- Root comment in sheet -->
+              <CommentItem :comment="sheetThread" :articleId="articleId" :likedIds="likedIds"
+                @reply="openReply" @like="likeComment" />
+              <!-- All replies -->
+              <div class="yt-sheet-replies">
+                <div v-for="reply in sheetThread.children" :key="reply.id" class="yt-reply-wrapper">
+                  <CommentItem :comment="reply" :articleId="articleId" :isReply="true" :likedIds="likedIds"
+                    @reply="openReply" @like="likeComment" />
+                </div>
+              </div>
+              <!-- Reply form in sheet -->
+              <div v-if="replyingTo" class="yt-reply-form">
+                <div class="yt-post-avatar small">
+                  <span class="yt-avatar-fallback small" style="background: #8b5cf6">
+                    {{ form.authorName ? form.authorName.charAt(0).toUpperCase() : '?' }}
+                  </span>
+                </div>
+                <div class="yt-post-form focused">
+                  <textarea v-model="replyContent"
+                    :placeholder="`回复 @${replyingTo.authorName}...`"
+                    rows="1" @input="autoResize($event)" />
+                  <div class="yt-post-actions">
+                    <div class="yt-post-btns">
+                      <button class="yt-btn cancel" @click="replyingTo = null; replyContent = ''">取消</button>
+                      <button class="yt-btn submit" :disabled="!replyContent.trim() || submitting"
+                        @click="submitComment(replyingTo!.id)">回复</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import request from '../utils/request'
 import CommentItem from './CommentItem.vue'
 
@@ -66,19 +177,28 @@ const props = defineProps<{ articleId: number }>()
 const comments = ref<any[]>([])
 const loading = ref(true)
 const sortBy = ref('newest')
-const replyingTo = ref<number | null>(null)
+const formFocused = ref(false)
+const form = ref({ authorName: '', authorEmail: '', content: '' })
+const replyingTo = ref<any>(null)
 const replyContent = ref('')
 const submitting = ref(false)
 const submitError = ref('')
 const submitSuccess = ref(false)
-const form = ref({ authorName: '', authorEmail: '', content: '' })
+const expandedThreads = ref<Record<number, boolean>>({})
+const hoveringToggle = ref<number | null>(null)
+const sheetThread = ref<any>(null)
+const isMobile = ref(false)
+const mainTextarea = ref<HTMLTextAreaElement>()
+const replyTextarea = ref<HTMLTextAreaElement>()
+const likedIds = ref<Set<number>>(new Set())
 
-// Load saved name/email from localStorage
-onMounted(() => {
-  form.value.authorName = localStorage.getItem('comment-name') || ''
-  form.value.authorEmail = localStorage.getItem('comment-email') || ''
-  loadComments()
-})
+const sortOptions = [
+  { key: 'newest', label: '最新' },
+  { key: 'oldest', label: '最早' },
+  { key: 'popular', label: '最热' },
+]
+
+const canSubmitMain = computed(() => form.value.authorName.trim() && form.value.content.trim())
 
 const totalCount = computed(() => {
   let count = 0
@@ -90,10 +210,8 @@ const totalCount = computed(() => {
 
 const sortedComments = computed(() => {
   const list = [...comments.value]
-  // Pinned always first
   const pinned = list.filter((c: any) => c.isPinned)
   const unpinned = list.filter((c: any) => !c.isPinned)
-
   switch (sortBy.value) {
     case 'oldest':
       unpinned.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
@@ -101,11 +219,27 @@ const sortedComments = computed(() => {
     case 'popular':
       unpinned.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0))
       break
-    default: // newest
+    default:
       unpinned.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }
   return [...pinned, ...unpinned]
 })
+
+function checkMobile() { isMobile.value = window.innerWidth < 768 }
+
+onMounted(() => {
+  form.value.authorName = localStorage.getItem('comment-name') || ''
+  form.value.authorEmail = localStorage.getItem('comment-email') || ''
+  // Restore liked IDs from localStorage
+  try {
+    const saved = JSON.parse(localStorage.getItem('comment-liked') || '[]')
+    likedIds.value = new Set(saved)
+  } catch { likedIds.value = new Set() }
+  loadComments()
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+onUnmounted(() => { window.removeEventListener('resize', checkMobile) })
 
 async function loadComments() {
   loading.value = true
@@ -116,20 +250,47 @@ async function loadComments() {
   finally { loading.value = false }
 }
 
-function openReply(commentId: number) {
-  replyingTo.value = replyingTo.value === commentId ? null : commentId
+function toggleReplies(thread: any) {
+  if (isMobile.value) {
+    sheetThread.value = thread
+  } else {
+    expandedThreads.value[thread.id] = !expandedThreads.value[thread.id]
+  }
+}
+
+function openReply(comment: any) {
+  // Determine the root thread for positioning the reply form
+  const rootId = comment.rootId || comment.parentId || comment.id
+  const resolvedRootId = comment.parentId ? rootId : comment.id
+  replyingTo.value = { ...comment, rootId: resolvedRootId }
   replyContent.value = ''
+  // Auto-expand the thread so the reply form is visible
+  expandedThreads.value[resolvedRootId] = true
+  nextTick(() => {
+    replyTextarea.value?.focus()
+  })
 }
 
 async function likeComment(id: number) {
+  const alreadyLiked = likedIds.value.has(id)
   try {
-    await request.post(`/api/comments/${id}/like`)
-    // Optimistic update
+    if (alreadyLiked) {
+      await request.post(`/api/comments/${id}/unlike`)
+      likedIds.value.delete(id)
+    } else {
+      await request.post(`/api/comments/${id}/like`)
+      likedIds.value.add(id)
+    }
+    localStorage.setItem('comment-liked', JSON.stringify([...likedIds.value]))
     const updateLike = (list: any[]) => {
       for (const c of list) {
-        if (c.id === id) { c.likeCount = (c.likeCount || 0) + 1; return }
-        if (c.children) updateLike(c.children)
+        if (c.id === id) {
+          c.likeCount = Math.max(0, (c.likeCount || 0) + (alreadyLiked ? -1 : 1))
+          return true
+        }
+        if (c.children && updateLike(c.children)) return true
       }
+      return false
     }
     updateLike(comments.value)
   } catch {}
@@ -151,57 +312,347 @@ async function submitComment(parentId: number | null) {
       authorEmail: form.value.authorEmail.trim() || null,
       content: content.trim()
     })
-    // Save name/email for next time
     localStorage.setItem('comment-name', name.trim())
     if (form.value.authorEmail) localStorage.setItem('comment-email', form.value.authorEmail.trim())
 
-    if (parentId) { replyContent.value = ''; replyingTo.value = null }
-    else { form.value.content = '' }
+    const newComment: any = {
+      id: Date.now(),
+      authorName: name.trim(),
+      content: content.trim(),
+      createdAt: new Date().toISOString(),
+      likeCount: 0,
+      isPending: true
+    }
+
+    if (parentId) {
+      // Find root thread and add reply
+      newComment.replyToUserName = replyingTo.value?.authorName
+      newComment.parentId = parentId
+      for (const c of comments.value) {
+        if (c.id === parentId || (c.children?.some((r: any) => r.id === parentId))) {
+          if (!c.children) c.children = []
+          c.children.push(newComment)
+          // Auto-expand this thread
+          expandedThreads.value[c.id] = true
+          break
+        }
+      }
+      replyContent.value = ''
+      replyingTo.value = null
+    } else {
+      newComment.children = []
+      comments.value.unshift(newComment)
+      form.value.content = ''
+      formFocused.value = false
+    }
     submitSuccess.value = true
-    setTimeout(() => { submitSuccess.value = false }, 5000)
-    // Reload comments (the new one won't show until approved, but just in case)
-    await loadComments()
+    setTimeout(() => submitSuccess.value = false, 3000)
   } catch (e: any) {
-    submitError.value = e?.response?.data?.message || 'Failed to post comment'
+    submitError.value = e?.response?.data?.message || '评论发送失败'
+    setTimeout(() => submitError.value = '', 4000)
   } finally { submitting.value = false }
+}
+
+function cancelMainForm() {
+  formFocused.value = false
+  form.value.content = ''
+}
+
+function autoResize(e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
 }
 </script>
 
 <style scoped>
-.comment-section { margin-top: 48px; }
-.comment-section h2 { font-size: 24px; font-weight: 700; color: var(--text-heading); margin-bottom: 16px; }
-.count { font-size: 16px; color: var(--text-dim); font-weight: 400; }
+/* ===== Root ===== */
+.yt-comments { margin-top: 48px; }
 
-.sort-bar { display: flex; gap: 8px; margin-bottom: 20px; }
-.sort-bar button { padding: 6px 16px; border-radius: 20px; font-size: 13px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
-.sort-bar button.active { background: rgba(99,102,241,0.15); border-color: var(--primary); color: var(--primary-light); }
+/* ===== Header ===== */
+.yt-comments-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px; gap: 16px; flex-wrap: wrap;
+}
+.yt-comments-header h2 {
+  font-size: 20px; font-weight: 700;
+  color: var(--text-heading); margin: 0;
+  font-family: var(--font-heading);
+}
+.yt-sort { display: flex; gap: 4px; }
+.yt-sort button {
+  padding: 6px 14px; border-radius: 999px; font-size: 13px;
+  border: none; background: transparent;
+  color: var(--text-dim); cursor: pointer;
+  font-weight: 500; font-family: inherit;
+  transition: all 0.2s;
+}
+.yt-sort button:hover { background: var(--bg-hover); }
+.yt-sort button.active {
+  background: var(--text-heading); color: var(--bg);
+}
 
-.comment-form-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
-.comment-form-card h3 { font-size: 16px; font-weight: 600; color: var(--text-heading); margin-bottom: 16px; }
-.form-row { display: flex; gap: 12px; margin-bottom: 12px; }
-.form-row input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
-.form-row input:focus { border-color: var(--primary); }
-textarea { width: 100%; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; outline: none; resize: vertical; font-family: inherit; margin-bottom: 12px; }
-textarea:focus { border-color: var(--primary); }
-.form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
-.btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
-.btn-primary { background: var(--primary); color: #fff; }
-.btn-primary:hover { background: var(--primary-dark); }
-.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-.btn-sm { padding: 8px 16px; font-size: 13px; }
-.error-msg { color: var(--accent-red); font-size: 13px; }
-.success-msg { color: var(--accent-green); font-size: 13px; }
+/* ===== Post Box ===== */
+.yt-post-box {
+  display: flex; gap: 16px; margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.yt-post-avatar { flex-shrink: 0; }
+.yt-avatar-fallback {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: #fff;
+  user-select: none;
+}
+.yt-avatar-fallback.small { width: 28px; height: 28px; font-size: 12px; }
+.yt-post-avatar.small { flex-shrink: 0; }
 
-.comments-list { display: flex; flex-direction: column; gap: 16px; }
-.comment-thread { }
-.replies { padding-left: 40px; border-left: 2px solid var(--border); margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
-.reply-form { padding-left: 40px; margin-top: 8px; }
+.yt-post-form {
+  flex: 1; min-width: 0;
+}
+.yt-post-inputs {
+  display: flex; gap: 12px; margin-bottom: 8px;
+}
+.yt-post-inputs input {
+  flex: 1; padding: 8px 0; border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent; color: var(--text-primary);
+  font-size: 14px; outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+.yt-post-inputs input:focus { border-bottom-color: var(--text-heading); }
+.yt-post-inputs input::placeholder { color: var(--text-dim); }
 
-.empty-comments { text-align: center; color: var(--text-dim); padding: 40px; font-size: 15px; }
+.yt-post-form textarea {
+  width: 100%; padding: 8px 0; border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent; color: var(--text-primary);
+  font-size: 14px; outline: none; resize: none;
+  font-family: inherit; min-height: 28px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.yt-post-form textarea:focus { border-bottom-color: var(--text-heading); }
+.yt-post-form textarea::placeholder { color: var(--text-dim); }
 
+.yt-post-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 8px; gap: 8px; flex-wrap: wrap;
+}
+.yt-post-btns {
+  display: flex; gap: 8px; margin-left: auto;
+}
+.yt-error { font-size: 13px; color: #ef4444; }
+.yt-success { font-size: 13px; color: #10b981; }
+
+.yt-btn {
+  padding: 8px 16px; border-radius: 999px;
+  font-size: 14px; font-weight: 600;
+  border: none; cursor: pointer;
+  font-family: inherit; transition: all 0.2s;
+}
+.yt-btn.cancel {
+  background: transparent; color: var(--text-muted);
+}
+.yt-btn.cancel:hover { background: var(--bg-hover); }
+.yt-btn.submit {
+  background: #3b82f6; color: #fff;
+}
+.yt-btn.submit:hover { background: #2563eb; }
+.yt-btn.submit:disabled {
+  opacity: 0.5; cursor: not-allowed;
+  background: var(--bg-hover); color: var(--text-dim);
+}
+
+/* ===== Comment List ===== */
+.yt-list { display: flex; flex-direction: column; }
+.yt-thread { position: relative; }
+
+/* ===== Replies Zone — Guide Lines ===== */
+.yt-replies-zone {
+  position: relative;
+  margin-left: 20px;  /* center under root avatar (40px / 2) */
+  padding-left: 36px; /* space for guide line + branch */
+}
+
+/* Vertical stem line */
+.yt-replies-zone::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -8px;
+  bottom: 0;
+  border-left: 2px solid var(--border);
+  transition: border-color 0.25s;
+}
+/* When not expanded, stem only goes to the toggle button */
+.yt-replies-zone:not(.is-expanded)::before {
+  bottom: calc(100% - 36px);
+  top: -8px;
+}
+/* Hover highlight */
+.yt-replies-zone.is-hovering::before {
+  border-left-color: var(--text-dim);
+}
+
+/* Toggle button */
+.yt-toggle-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 999px;
+  border: none; background: transparent;
+  color: #3b82f6; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  transition: all 0.2s;
+  position: relative;
+}
+.yt-toggle-btn::before {
+  /* branch line from stem to button */
+  content: '';
+  position: absolute;
+  left: -36px; top: 50%;
+  width: 24px; height: 16px;
+  border-left: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  border-bottom-left-radius: 12px;
+  border-right: none; border-top: none;
+  transition: border-color 0.25s;
+}
+.yt-toggle-btn:hover {
+  background: rgba(59,130,246,0.08);
+}
+.yt-replies-zone.is-hovering .yt-toggle-btn::before {
+  border-color: var(--text-dim);
+}
+
+/* ===== Replies List ===== */
+.yt-replies-list { padding-top: 4px; }
+
+.yt-reply-wrapper {
+  position: relative;
+  padding-left: 0;
+}
+/* L-shaped branch for each reply */
+.yt-reply-wrapper::before {
+  content: '';
+  position: absolute;
+  left: -36px;
+  top: 0;
+  width: 24px;
+  height: 32px;
+  border-left: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  border-bottom-left-radius: 12px;
+  border-right: none; border-top: none;
+  transition: border-color 0.25s;
+}
+/* Vertical continuation line between replies */
+.yt-reply-wrapper:not(.is-last)::after {
+  content: '';
+  position: absolute;
+  left: -36px;
+  top: 32px;
+  bottom: 0;
+  border-left: 2px solid var(--border);
+  transition: border-color 0.25s;
+}
+/* Hover highlight on all lines */
+.yt-replies-zone.is-hovering .yt-reply-wrapper::before,
+.yt-replies-zone.is-hovering .yt-reply-wrapper::after {
+  border-color: var(--text-dim);
+}
+
+/* ===== Reply form wrapper ===== */
+.yt-reply-form-wrapper {
+  margin-left: 56px; /* align with root body */
+  padding: 8px 0;
+}
+.yt-reply-form {
+  display: flex; gap: 12px;
+}
+
+/* ===== Empty ===== */
+.yt-empty {
+  text-align: center; padding: 48px 24px;
+  color: var(--text-dim);
+}
+.yt-empty-icon { font-size: 48px; margin-bottom: 12px; }
+.yt-empty p { font-size: 15px; }
+
+/* ===== Expand Transition ===== */
+.yt-expand-enter-active { transition: all 0.3s ease-out; overflow: hidden; }
+.yt-expand-leave-active { transition: all 0.2s ease-in; overflow: hidden; }
+.yt-expand-enter-from { opacity: 0; max-height: 0; transform: translateY(-8px); }
+.yt-expand-enter-to { opacity: 1; max-height: 2000px; transform: translateY(0); }
+.yt-expand-leave-from { opacity: 1; max-height: 2000px; }
+.yt-expand-leave-to { opacity: 0; max-height: 0; }
+
+/* ===== Mobile BottomSheet ===== */
+.yt-sheet-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 10000;
+  display: flex; align-items: flex-end;
+  backdrop-filter: blur(4px);
+}
+.yt-sheet {
+  background: var(--bg); width: 100%;
+  max-height: 85vh;
+  border-radius: 16px 16px 0 0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: sheetUp 0.3s ease-out;
+}
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.yt-sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--text-dim); border-radius: 2px;
+  margin: 12px auto 0;
+  opacity: 0.4;
+}
+.yt-sheet-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px; border-bottom: 1px solid var(--border);
+}
+.yt-sheet-header h3 {
+  font-size: 16px; font-weight: 700;
+  color: var(--text-heading); margin: 0;
+}
+.yt-sheet-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; background: var(--bg-hover);
+  color: var(--text-muted); font-size: 16px;
+  cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+.yt-sheet-body {
+  flex: 1; overflow-y: auto;
+  padding: 16px 20px; -webkit-overflow-scrolling: touch;
+}
+.yt-sheet-replies {
+  margin-left: 24px; padding-top: 8px;
+  border-left: 2px solid var(--border);
+  padding-left: 16px;
+}
+
+/* Sheet transitions */
+.yt-sheet-enter-active { transition: opacity 0.3s; }
+.yt-sheet-leave-active { transition: opacity 0.2s; }
+.yt-sheet-enter-from, .yt-sheet-leave-to { opacity: 0; }
+.yt-sheet-enter-from .yt-sheet { transform: translateY(100%); }
+
+/* ===== Responsive ===== */
 @media (max-width: 768px) {
-  .form-row { flex-direction: column; }
-  .replies { padding-left: 20px; }
-  .reply-form { padding-left: 20px; }
+  .yt-post-inputs { flex-direction: column; gap: 0; }
+  .yt-replies-zone { margin-left: 16px; padding-left: 28px; }
+  .yt-toggle-btn::before { left: -28px; width: 18px; }
+  .yt-reply-wrapper::before { left: -28px; width: 18px; }
+  .yt-reply-wrapper::after { left: -28px; }
+  .yt-reply-form-wrapper { margin-left: 40px; }
+  .yt-comments-header { flex-direction: column; align-items: flex-start; }
 }
 </style>

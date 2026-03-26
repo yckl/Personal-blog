@@ -1,0 +1,31 @@
+# IDE / Editor
+.idea/
+.vscode/
+*.iml
+
+# Node
+**/node_modules/
+**/.vite/
+**/dist/
+
+# Java / Maven
+**/target/
+*.class
+*.log
+
+# Runtime files
+logs/
+blog-server/uploads/
+
+# Env / local overrides
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local scratch files
+/test_*.js
+/git

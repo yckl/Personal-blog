@@ -1,4 +1,5 @@
 import axios from 'axios'
+import router from '../router'
 
 const request = axios.create({
   baseURL: import.meta.env.DEV ? '' : 'http://localhost:8088',
@@ -33,6 +34,11 @@ function processQueue(error: any, token: string | null = null) {
 request.interceptors.response.use(
   (response) => {
     const res = response.data
+    if (res.code === 404) {
+      const path = window.location.pathname.substring(1).split('/')
+      router.replace({ name: 'NotFound', params: { pathMatch: path.length ? path : ['404'] } })
+      return Promise.reject(new Error(res.message || '资源不存在'))
+    }
     if (res.code !== 200) {
       return Promise.reject(new Error(res.message || '请求失败'))
     }
@@ -40,6 +46,11 @@ request.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config
+
+    if (error.response?.status === 404) {
+      const path = window.location.pathname.substring(1).split('/')
+      router.replace({ name: 'NotFound', params: { pathMatch: path.length ? path : ['404'] } })
+    }
 
     // 401 — attempt token refresh
     if (error.response?.status === 401 && !originalRequest._retry) {

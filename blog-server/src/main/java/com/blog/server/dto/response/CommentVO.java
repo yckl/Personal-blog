@@ -11,6 +11,8 @@ public class CommentVO {
     private Long id;
     private Long articleId;
     private Long parentId;
+    private Long rootId;
+    private String replyToUserName;
     private String authorName;
     private String authorEmail;
     private String authorUrl;
@@ -21,6 +23,6 @@ public class CommentVO {
     private Boolean isPinned;
     private LocalDateTime createdAt;
 
-    // Nested replies
+    // Nested replies (flattened to 2 levels: root + all descendants)
     private List<CommentVO> children;
 }

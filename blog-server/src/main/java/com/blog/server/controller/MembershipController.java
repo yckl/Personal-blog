@@ -23,6 +23,7 @@ public class MembershipController {
 
     private final MemberMapper memberMapper;
     private final MembershipPlanMapper planMapper;
+    private final PaymentOrderMapper paymentOrderMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -214,6 +215,66 @@ public class MembershipController {
         return Result.ok(plan);
     }
 
+    // ============ Member Upgrade ============
+
+    /**
+     * Upgrade member tier (mock payment — directly marks as PAID).
+     */
+    @PostMapping("/api/membership/upgrade")
+    public Result<Map<String, Object>> upgradeMembership(@RequestBody UpgradeRequest req) {
+        // Get authenticated member from SecurityContext
+        Object principal = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof Member member)) {
+            return Result.fail("未登录或登录已过期");
+        }
+
+        // Look up the plan
+        MembershipPlan plan = planMapper.selectById(req.getPlanId());
+        if (plan == null || !Boolean.TRUE.equals(plan.getIsActive())) {
+            return Result.fail("无效的会员计划");
+        }
+
+        // Create PaymentOrder record
+        PaymentOrder order = new PaymentOrder();
+        order.setOrderNo("MBR" + System.currentTimeMillis());
+        order.setMemberId(member.getId());
+        order.setPlanId(plan.getId());
+        order.setAmountCents(plan.getPriceCents());
+        order.setCurrency(plan.getCurrency() != null ? plan.getCurrency() : "CNY");
+        order.setPaymentMethod("mock");
+        order.setPaymentProvider("mock");
+        order.setStatus("PAID");
+        order.setPaidAt(LocalDateTime.now());
+        paymentOrderMapper.insert(order);
+
+        // Update member tier
+        LocalDateTime newExpiry;
+        if ("PREMIUM".equals(member.getTier()) && member.getTierExpiresAt() != null
+                && member.getTierExpiresAt().isAfter(LocalDateTime.now())) {
+            // Extend from current expiry
+            newExpiry = member.getTierExpiresAt().plusMonths(plan.getDurationMonths());
+        } else {
+            newExpiry = LocalDateTime.now().plusMonths(plan.getDurationMonths());
+        }
+
+        memberMapper.update(null, new LambdaUpdateWrapper<Member>()
+                .eq(Member::getId, member.getId())
+                .set(Member::getTier, plan.getTier())
+                .set(Member::getTierExpiresAt, newExpiry));
+
+        // Return updated info
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", member.getId());
+        result.put("email", member.getEmail());
+        result.put("nickname", member.getNickname());
+        result.put("avatar", member.getAvatar());
+        result.put("tier", plan.getTier());
+        result.put("tierExpiresAt", newExpiry);
+        result.put("orderNo", order.getOrderNo());
+        return Result.ok(result);
+    }
+
     // ============ DTOs ============
 
     @Data
@@ -227,5 +288,10 @@ public class MembershipController {
     public static class MemberLoginRequest {
         private String email;
         private String password;
+    }
+
+    @Data
+    public static class UpgradeRequest {
+        private Long planId;
     }
 }

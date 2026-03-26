@@ -22,5 +22,7 @@ public interface CommentService {
 
     void likeComment(Long id);
 
+    void unlikeComment(Long id);
+
     void togglePinComment(Long id);
 }

@@ -15,7 +15,9 @@ public interface AuthService {
 
     LoginResponse refreshToken(RefreshTokenRequest request);
 
-    void logout(Long userId);
+    void logout(Long userId, String token);
+
+    boolean isTokenBlacklisted(String token);
 
     void register(RegisterRequest request);
 

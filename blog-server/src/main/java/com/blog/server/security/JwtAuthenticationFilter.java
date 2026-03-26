@@ -4,6 +4,7 @@ import com.blog.server.entity.Member;
 import com.blog.server.entity.SysUser;
 import com.blog.server.mapper.MemberMapper;
 import com.blog.server.mapper.SysUserMapper;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final SysUserMapper sysUserMapper;
+    private final StringRedisTemplate redisTemplate;
+
+    private static final String TOKEN_BLACKLIST_PREFIX = "token:blacklist:";
     private final MemberMapper memberMapper;
 
     @Override
@@ -35,7 +39,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
         String token = extractToken(request);
 
-        if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
+        if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)
+                && !isTokenBlacklisted(token)) {
             String tokenType = jwtTokenProvider.getTokenType(token);
 
             if ("access".equals(tokenType)) {
@@ -84,5 +89,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    private boolean isTokenBlacklisted(String token) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(TOKEN_BLACKLIST_PREFIX + token));
     }
 }

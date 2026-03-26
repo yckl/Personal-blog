@@ -52,9 +52,9 @@
       </div>
 
       <!-- Empty -->
-      <div class="empty-state" v-if="!displayArticles.length && !loading">
-        <p>No articles in this category yet.</p>
-      </div>
+      <EmptyState v-if="!displayArticles.length && !loading"
+                  title="分类下还没有文章哦"
+                  message="博主正在努力构思中，去探索一下其他领域吧。" />
     </div>
   </div>
 </template>
@@ -63,6 +63,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import request from '../utils/request'
+import EmptyState from '../components/ui/EmptyState.vue'
 
 const route = useRoute()
 const category = ref<any>({})
@@ -260,7 +261,7 @@ watch(() => route.params.slug, () => { activeSubcatId.value = null; load() })
 @media (max-width: 1024px) {
   .articles-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 }
-@media (max-width: 768px) {
+@media (max-width: 640px) {
   .articles-grid { grid-template-columns: 1fr; gap: 24px; }
   .hero-title { font-size: 32px; }
   .hero-icon { width: 80px; height: 80px; font-size: 36px; }

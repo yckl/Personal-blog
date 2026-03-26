@@ -24,6 +24,27 @@
     </section>
 
     <div class="main-content">
+      <!-- ===== Loading Skeleton ===== -->
+      <div v-if="loading" class="home-skeletons fade-in">
+        <section class="section">
+          <div class="section-header">
+            <h2 class="section-title"><span class="title-icon">⏳</span> 正在加载...</h2>
+          </div>
+          <div class="featured-grid">
+            <div class="skeleton-card shimmer" style="height: 380px; border-radius: 20px;" v-for="i in 3" :key="i"></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-header" style="margin-top: 24px;">
+            <h2 class="section-title"><span class="title-icon">⏳</span> 正在加载内容...</h2>
+          </div>
+          <div class="masonry-grid">
+            <div class="skeleton-card shimmer" style="height: 300px; border-radius: 16px;" v-for="i in 3" :key="'m'+i"></div>
+          </div>
+        </section>
+      </div>
+
+      <template v-else>
       <!-- ===== Featured Posts (编辑推荐) ===== -->
       <section class="section" v-if="featuredArticles.length">
         <div class="section-header">
@@ -141,6 +162,7 @@
           <p v-if="subscribed" class="success-msg">✅ 订阅成功！</p>
         </GlassCard>
       </section>
+      </template>
 
     </div>
   </div>
@@ -150,12 +172,24 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { getHomepageData, subscribe } from '../api'
 import GlassCard from '../components/ui/GlassCard.vue'
+import { useHead } from '@vueuse/head'
+import type { Article } from '../types'
+
+useHead({
+  title: 'YCK\'s Blog',
+  meta: [
+    { name: 'description', content: '个人技术与生活博客，分享全栈开发与思考' },
+    { property: 'og:title', content: 'YCK\'s Blog' },
+    { property: 'og:description', content: '个人技术与生活博客，分享全栈开发与思考' }
+  ]
+})
 
 const hero = ref<any>({ title: '', subtitle: '', ctaLink: '' })
 const featuredArticles = ref<any[]>([])
 const latestArticles = ref<any[]>([])
 const popularArticles = ref<any[]>([])
 const seriesList = ref<any[]>([])
+const loading = ref(true)
 const email = ref('')
 const subscribing = ref(false)
 const subscribed = ref(false)
@@ -253,6 +287,7 @@ onMounted(async () => {
     popularArticles.value = data.popularArticles || []
     seriesList.value = data.seriesList || []
   } catch (e) { console.error(e) }
+  finally { loading.value = false }
 
   initParticles()
 })
@@ -465,4 +500,12 @@ onUnmounted(() => {
   .hot-rank-num { font-size: 16px; }
   .series-card-link { min-width: 300px; }
 }
+
+/* Skeleton Shimmer */
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 </style>

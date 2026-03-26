@@ -414,15 +414,6 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('beforeunload', handleBeforeUnload)
-})
-
-onUnmounted(() => {
-  if (autoSaveTimer) clearTimeout(autoSaveTimer)
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-})
-
 // Prevent in-app navigation with unsaved changes
 import { onBeforeRouteLeave } from 'vue-router'
 onBeforeRouteLeave((_to, _from, next) => {
@@ -434,6 +425,25 @@ onBeforeRouteLeave((_to, _from, next) => {
   }
 })
 
+// Ctrl+S / Cmd+S save shortcut
+function handleKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault()
+    handleSave()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener('keydown', handleKeydown)
+})
+
 // ---- Image upload handler (integrates with media library) ----
 
 async function handleUploadImg(files: File[], callback: (urls: string[]) => void) {
@@ -441,9 +451,10 @@ async function handleUploadImg(files: File[], callback: (urls: string[]) => void
   for (const file of files) {
     try {
       const res: any = await uploadMedia(file)
-      urls.push('http://localhost:8088' + res.data.fileUrl)
+      // Use relative URL — the server serves media from the same origin
+      urls.push(res.data.fileUrl)
     } catch (e: any) {
-      ElMessage.error('Image upload failed: ' + (e.message || ''))
+      ElMessage.error('图片上传失败: ' + (e.message || ''))
     }
   }
   callback(urls)
@@ -452,16 +463,16 @@ async function handleUploadImg(files: File[], callback: (urls: string[]) => void
 // ---- Save / Publish ----
 
 async function handleSave() {
-  if (!form.title.trim()) { ElMessage.warning('Title is required'); return }
+  if (!form.title.trim()) { ElMessage.warning('请填写文章标题'); return }
   saving.value = true
   try {
     if (isEdit.value) {
       await updateArticle(Number(route.params.id), form)
-      ElMessage.success('Article updated')
+      ElMessage.success('文章已更新')
       loadVersions()
     } else {
       const res: any = await createArticle(form)
-      ElMessage.success('Article created')
+      ElMessage.success('文章已创建')
       router.replace(`/articles/edit/${res.data}`)
     }
   } catch (e: any) { ElMessage.error(e.message) }
@@ -479,7 +490,7 @@ async function handlePublish() {
         sendNewsletter: publishOptions.sendNewsletter,
         visibility: publishOptions.visibility
       })
-      ElMessage.success('Article scheduled!')
+      ElMessage.success('文章已定时发布')
     } else {
       // Publish now
       await updateArticle(Number(route.params.id), form)
@@ -487,7 +498,7 @@ async function handlePublish() {
         sendNewsletter: publishOptions.sendNewsletter,
         visibility: publishOptions.visibility
       })
-      ElMessage.success('Published!' + (publishOptions.sendNewsletter ? ' Newsletter sending...' : ''))
+      ElMessage.success('文章已发布' + (publishOptions.sendNewsletter ? '，正在发送邮件订阅...' : ''))
     }
     showPublishDialog.value = false
     form.status = publishOptions.mode === 'schedule' ? 'SCHEDULED' : publishOptions.visibility
@@ -502,7 +513,7 @@ async function handlePreview() {
     const url = res.data?.previewUrl
     if (url) {
       await navigator.clipboard.writeText(url)
-      ElMessage.success('Preview link copied! Valid for 24 hours.')
+      ElMessage.success('预览链接已复制！24小时内有效。')
     }
   } catch (e: any) { ElMessage.error(e.message) }
 }

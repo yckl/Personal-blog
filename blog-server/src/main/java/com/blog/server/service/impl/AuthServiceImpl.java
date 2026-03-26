@@ -1,6 +1,7 @@
 package com.blog.server.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.blog.server.annotation.LogOperation;
 import com.blog.server.dto.request.LoginRequest;
 import com.blog.server.dto.request.RefreshTokenRequest;
 import com.blog.server.dto.request.RegisterRequest;
@@ -15,6 +16,7 @@ import com.blog.server.mapper.SysUserMapper;
 import com.blog.server.mapper.SysUserRoleMapper;
 import com.blog.server.security.JwtTokenProvider;
 import com.blog.server.security.TotpService;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import com.blog.server.service.AuthService;
 import com.blog.server.service.SystemLogService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 
 @Service
@@ -36,25 +39,51 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TotpService totpService;
     private final SystemLogService systemLogService;
+    private final StringRedisTemplate redisTemplate;
+
+    private static final String TOKEN_BLACKLIST_PREFIX = "token:blacklist:";
+    private static final String LOGIN_ERR_PREFIX = "login:err:";
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final long LOCKOUT_DURATION = 15; // minutes
 
     @Override
+    @LogOperation(type = "LOGIN")
     public LoginResponse login(LoginRequest request, String ip) {
+        String username = request.getUsername();
+        String errKey = LOGIN_ERR_PREFIX + username;
+
+        // Check if account is locked out locally via Redis counter bounds
+        String errCountStr = redisTemplate.opsForValue().get(errKey);
+        if (errCountStr != null && Integer.parseInt(errCountStr) >= MAX_FAILED_ATTEMPTS) {
+            throw new BusinessException(403, "Account locked for 15 minutes due to too many failed attempts");
+        }
+
         SysUser user = sysUserMapper.selectOne(
                 new LambdaQueryWrapper<SysUser>()
-                        .eq(SysUser::getUsername, request.getUsername())
+                        .eq(SysUser::getUsername, username)
         );
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            // Log failed attempt
+            // Log failed attempt and increment lockout counter
             Long failedUserId = user != null ? user.getId() : null;
             systemLogService.logLogin(failedUserId, ip, false, "Invalid username or password");
+
+            redisTemplate.opsForValue().increment(errKey);
+            // Ensure TTL is fully attached for rolling windows
+            Long expire = redisTemplate.getExpire(errKey);
+            if (expire != null && expire == -1) {
+                redisTemplate.expire(errKey, LOCKOUT_DURATION, TimeUnit.MINUTES);
+            }
+
             throw new BusinessException(401, "Invalid username or password");
         }
 
         if (user.getStatus() != 1) {
-            systemLogService.logLogin(user.getId(), ip, false, "Account is disabled");
             throw new BusinessException(403, "Account is disabled");
         }
+
+        // Clear failures on successful validation bounds
+        redisTemplate.delete(errKey);
 
         // Check if 2FA is enabled
         if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
@@ -71,6 +100,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @LogOperation(type = "LOGIN")
     public LoginResponse verify2fa(Verify2faRequest request, String ip) {
         String tempToken = request.getTempToken();
 
@@ -86,7 +116,6 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (!totpService.verifyCode(user.getTwoFactorSecret(), request.getCode())) {
-            systemLogService.logLogin(userId, ip, false, "Invalid 2FA code");
             throw new BusinessException(401, "Invalid verification code");
         }
 
@@ -127,14 +156,38 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void logout(Long userId) {
-        // Client-side token removal is sufficient.
-        // For additional security, we could blacklist the token in Redis here.
+    public void logout(Long userId, String token) {
+        if (token != null && !token.isEmpty()) {
+            // Add token to Redis blacklist with TTL matching token's remaining expiration
+            try {
+                long remainingMs = jwtTokenProvider.getRemainingExpiration(token);
+                if (remainingMs > 0) {
+                    redisTemplate.opsForValue().set(
+                            TOKEN_BLACKLIST_PREFIX + token, "1",
+                            remainingMs, TimeUnit.MILLISECONDS);
+                }
+            } catch (Exception e) {
+                // Token may already be invalid — that's fine
+            }
+        }
+    }
+
+    /**
+     * Check if a token has been blacklisted (user logged out).
+     */
+    public boolean isTokenBlacklisted(String token) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(TOKEN_BLACKLIST_PREFIX + token));
     }
 
     @Override
     @Transactional
     public void register(RegisterRequest request) {
+        // Only allow registration when there are no users yet (bootstrapping)
+        Long totalUsers = sysUserMapper.selectCount(new LambdaQueryWrapper<>());
+        if (totalUsers > 0) {
+            throw new BusinessException(403, "Public registration is disabled. Please contact an administrator.");
+        }
+
         // Check if username exists
         Long count = sysUserMapper.selectCount(
                 new LambdaQueryWrapper<SysUser>()
@@ -154,7 +207,7 @@ public class AuthServiceImpl implements AuthService {
         user.setTwoFactorEnabled(false);
         sysUserMapper.insert(user);
 
-        // Assign ADMIN role (first registered user is admin)
+        // First user gets ADMIN role (bootstrapping)
         SysRole adminRole = sysRoleMapper.selectOne(
                 new LambdaQueryWrapper<SysRole>().eq(SysRole::getRoleKey, "ADMIN")
         );
@@ -196,9 +249,6 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLoginAt(LocalDateTime.now());
         user.setLastLoginIp(ip);
         sysUserMapper.updateById(user);
-
-        // Log successful login
-        systemLogService.logLogin(user.getId(), ip, true, null);
 
         LoginResponse response = new LoginResponse();
         response.setToken(token);

@@ -1,16 +1,48 @@
 <template>
-  <div v-if="article" class="article-page">
+  <!-- ===== Loading Skeleton ===== -->
+  <div v-if="pageLoading" class="article-page">
+    <div class="article-layout">
+      <article class="article-main">
+        <div class="skeleton-header">
+          <div class="skeleton-tags"><span class="skeleton-tag shimmer" /><span class="skeleton-tag shimmer" /></div>
+          <div class="skeleton-title shimmer" />
+          <div class="skeleton-title-short shimmer" />
+          <div class="skeleton-meta shimmer" />
+        </div>
+        <div class="skeleton-cover shimmer" />
+        <div class="skeleton-body">
+          <div class="skeleton-line shimmer" v-for="i in 8" :key="i" :style="{ width: (70 + Math.random() * 30) + '%' }" />
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <!-- ===== Error State ===== -->
+  <div v-else-if="pageError" class="article-page">
+    <div class="error-state glass-card">
+      <div class="error-icon">😵</div>
+      <h2>文章加载失败</h2>
+      <p>{{ pageError }}</p>
+      <div class="error-actions">
+        <button class="btn btn-primary" @click="retryLoad">🔄 重新加载</button>
+        <router-link to="/articles" class="btn btn-ghost">← 返回文章列表</router-link>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Article Content ===== -->
+  <div v-else-if="article" class="article-page">
     <!-- ===== Floating Toolbar (appears at 30% scroll) ===== -->
     <Transition name="slide-in">
       <div class="floating-toolbar glass" v-show="showToolbar">
-        <button class="toolbar-btn" :class="{ active: liked }" @click="handleLike" title="Like">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <button class="toolbar-btn" :class="{ active: liked, 'like-anim': showLikeAnim }" @click="handleLike" title="喜欢">
+          <svg width="20" height="20" viewBox="0 0 24 24" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           <span v-if="article.likeCount">{{ article.likeCount }}</span>
         </button>
-        <button class="toolbar-btn" @click="shareArticle('copy')" title="Copy Link">
+        <button class="toolbar-btn" @click="shareArticle('copy')" title="复制链接">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
-        <button class="toolbar-btn" @click="shareArticle('twitter')" title="Share on X">
+        <button class="toolbar-btn" @click="shareArticle('twitter')" title="分享到 X">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         </button>
         <div class="toolbar-divider" />
@@ -57,7 +89,7 @@
         <div class="ai-summary-card glass-card" v-if="article.contentHtml || article.contentMd">
           <div class="ai-summary-header">
             <span class="ai-badge">🤖 AI 摘要</span>
-            <button v-if="!aiSummary && !aiLoading" class="ai-gen-btn" @click="generateAiSummary">
+            <button v-if="!aiSummaryRaw && !aiLoading" class="ai-gen-btn" @click="generateAiSummary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
               生成摘要
             </button>
@@ -66,19 +98,43 @@
             <div class="ai-dots"><span /><span /><span /></div>
             <span>AI 正在总结...</span>
           </div>
-          <p v-else-if="aiSummary" class="ai-summary-text">{{ aiSummary }}</p>
-          <p v-else-if="aiError" class="ai-error">{{ aiError }}</p>
+          <!-- Typewriter Effect -->
+          <div v-if="aiSummaryList.length > 0" class="ai-content typing">
+            <ul class="ai-bullets">
+              <li v-for="(point, idx) in aiSummaryList" :key="idx" class="fade-in">
+                ✨ {{ point }}
+              </li>
+            </ul>
+          </div>
+          <div v-if="aiError" class="ai-error">{{ aiError }}</div>
         </div>
 
+        <!-- ===== Mobile TOC ===== -->
+        <details class="mobile-toc glass-card" v-if="tocItems.length">
+          <summary>目录</summary>
+          <nav class="toc-nav">
+            <a v-for="(item, idx) in tocItems" :key="idx" :href="'#' + item.id"
+              :class="{ active: activeTocId === item.id }"
+              :style="{ paddingLeft: (item.level - 1) * 16 + 'px' }"
+              @click.prevent="scrollToHeading(item.id)">
+              <span class="toc-dot" />
+              {{ item.text }}
+            </a>
+          </nav>
+        </details>
+
         <!-- Content -->
-        <div ref="contentRef" class="article-content" v-html="article.contentHtml || article.contentMd" />
+        <div ref="contentRef" class="article-content" v-html="DOMPurify.sanitize(article.contentHtml || article.contentMd || '')" />
 
         <!-- Text Selection Share -->
         <div v-if="selectionTooltip.visible" class="selection-share-tooltip glass"
              :style="{ top: selectionTooltip.y + 'px', left: selectionTooltip.x + 'px' }">
-          <button @click="shareSelectedText('twitter')" title="Share on X">𝕏</button>
-          <button @click="shareSelectedText('copy')" title="Copy quote">📋</button>
+          <button @click="shareSelectedText('twitter')" title="分享到 X">𝕏</button>
+          <button @click="shareSelectedText('copy')" title="复制引用">📋</button>
         </div>
+
+        <!-- Poster Generator -->
+        <PosterGenerator :article="article" />
 
         <!-- Prev / Next -->
         <div class="article-nav" v-if="nav.prev || nav.next">
@@ -96,14 +152,19 @@
         <!-- Related Articles — Horizontal Snap Scroll -->
         <section class="related-section" v-if="relatedArticles.length">
           <h2>相关文章</h2>
-          <div class="related-scroll">
-            <router-link v-for="r in relatedArticles" :key="r.id" :to="`/article/${r.slug}`" class="related-card glass-card">
+          <div class="related-scroll" ref="relatedScrollRef" @scroll="onRelatedScroll">
+            <router-link v-for="r in relatedArticles" :key="r.id" :to="`/article/${r.slug || r.id}`" class="related-card glass-card">
               <div class="related-cover" :style="{ backgroundImage: r.coverImage ? `url(${r.coverImage})` : 'var(--gradient-1)' }" />
               <div class="related-body">
                 <h4>{{ r.title }}</h4>
                 <span class="card-meta">{{ formatDate(r.publishedAt) }} · {{ r.viewCount }} 阅读</span>
               </div>
             </router-link>
+          </div>
+          <div class="related-indicators" v-if="relatedTotalPages > 1">
+            <button v-for="i in relatedTotalPages" :key="i"
+              class="related-dot" :class="{ 'is-active': relatedPage === i }"
+              @click="scrollRelatedToPage(i)" />
           </div>
         </section>
 
@@ -151,15 +212,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { getArticleBySlug, recordVisit, subscribe, likeArticle, getLikeStatus } from '../api'
 import request from '../utils/request'
 import CommentSection from '../components/CommentSection.vue'
+import PosterGenerator from '../components/PosterGenerator.vue'
+import DOMPurify from 'dompurify'
+import { useHead } from '@vueuse/head'
+import type { Article } from '../types'
 
 const route = useRoute()
-const article = ref<any>(null)
+const article = ref<Article | null>(null)
+
+useHead({
+  title: computed(() => article.value ? `${article.value.title} - YCK's Blog` : 'Loading... - YCK\'s Blog'),
+  meta: [
+    { name: 'description', content: computed(() => article.value?.excerpt || '个人博客文章详情') },
+    { property: 'og:title', content: computed(() => article.value?.title || '') },
+    { property: 'og:description', content: computed(() => article.value?.excerpt || '') },
+    { property: 'og:image', content: computed(() => article.value?.coverImage || '') },
+    { name: 'twitter:card', content: 'summary_large_image' }
+  ]
+})
 const contentRef = ref<HTMLElement>()
+const pageLoading = ref(true)
+const pageError = ref('')
 
 // TOC
 const tocItems = ref<{ id: string; text: string; level: number }[]>([])
@@ -170,10 +248,14 @@ const readingProgress = ref(0)
 const showToolbar = ref(false)
 const liked = ref(false)
 const liking = ref(false)
+const showLikeAnim = ref(false)
 
 // Nav
-const nav = ref<any>({})
-const relatedArticles = ref<any[]>([])
+const nav = ref<{ prev?: Article; next?: Article }>({})
+const relatedArticles = ref<Article[]>([])
+const relatedScrollRef = ref<HTMLElement>()
+const relatedPage = ref(1)
+const relatedTotalPages = ref(1)
 
 // Lightbox
 const lightboxSrc = ref('')
@@ -188,7 +270,8 @@ const subscribeSuccess = ref(false)
 const currentUrl = ref('')
 
 // AI Summary
-const aiSummary = ref('')
+const aiSummaryList = ref<string[]>([])
+const aiSummaryRaw = ref('')
 const aiLoading = ref(false)
 const aiError = ref('')
 
@@ -215,19 +298,28 @@ async function generateAiSummary() {
   if (!article.value) return
   aiLoading.value = true
   aiError.value = ''
+  aiSummaryList.value = []
   try {
-    // Extract plain text from HTML content
-    const tmp = document.createElement('div')
-    tmp.innerHTML = article.value.contentHtml || article.value.contentMd || ''
-    const plainText = tmp.textContent?.substring(0, 3000) || ''
+    const res: any = await request.get(`/api/articles/${article.value.id}/ai-summary`)
+    let summaryJson = res.data || '[]'
     
-    const res: any = await request.post('/api/public/ai/summarize', {
-      title: article.value.title,
-      content: plainText
+    // Fallback parsing
+    let parsed: string[] = []
+    try { parsed = JSON.parse(summaryJson) } catch (err) { parsed = [summaryJson] }
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      parsed = ['暂无法生成摘要']
+    }
+
+    aiSummaryRaw.value = 'loaded'
+    // Typewriter effect logic
+    parsed.forEach((line, index) => {
+      setTimeout(() => {
+        aiSummaryList.value.push(line)
+      }, index * 800) // Reveal points sequentially
     })
-    aiSummary.value = res.data?.summary || res.data || '暂无法生成摘要'
   } catch (e: any) {
-    aiError.value = '生成失败，请稍后重试'
+    aiError.value = '大模型解析失败，请稍后重试'
   } finally {
     aiLoading.value = false
   }
@@ -275,8 +367,15 @@ async function handleLike() {
   liking.value = true
   try {
     const res: any = await likeArticle(article.value.id)
+    const wasLiked = liked.value
     liked.value = res.data.liked
     article.value.likeCount = res.data.likeCount
+    
+    // Trigger animation only when turning ON the like
+    if (!wasLiked && res.data.liked) {
+      showLikeAnim.value = true
+      setTimeout(() => { showLikeAnim.value = false }, 500)
+    }
   } catch {}
   finally { liking.value = false }
 }
@@ -305,11 +404,28 @@ function formatDate(d: string) {
 }
 
 async function loadArticle(slug: string) {
-  const res: any = await getArticleBySlug(slug)
-  article.value = res.data
+  pageLoading.value = true
+  pageError.value = ''
+  try {
+    const res: any = await getArticleBySlug(slug)
+    article.value = res.data
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 404) {
+      // Redirect to 404 page
+      const router = (await import('vue-router')).useRouter?.()
+      if (router) router.replace('/404')
+      else window.location.href = '/404'
+      return
+    }
+    pageError.value = e?.response?.data?.message || e?.message || '网络错误，请稍后重试'
+    pageLoading.value = false
+    return
+  }
+  pageLoading.value = false
   currentUrl.value = window.location.href
 
-  const a = res.data
+  const a = article.value
   const seoTitle = a.seoTitle || a.title
   document.title = seoTitle + ' - Blog'
   setMeta('description', a.metaDescription || a.excerpt || '')
@@ -340,14 +456,14 @@ async function loadArticle(slug: string) {
   const visitorId = localStorage.getItem('visitor_id') || (() => {
     const id = crypto.randomUUID(); localStorage.setItem('visitor_id', id); return id
   })()
-  recordVisit({ articleId: res.data.id, pageUrl: window.location.href, visitorId, pageType: 'article' }).catch(() => {})
+  recordVisit({ articleId: a.id, pageUrl: window.location.href, visitorId, pageType: 'article' }).catch(() => {})
 
-  try { const nRes: any = await request.get(`/api/public/articles/${res.data.id}/nav`); nav.value = nRes.data || {} } catch { nav.value = {} }
+  try { const nRes: any = await request.get(`/api/public/articles/${a.id}/nav`); nav.value = nRes.data || {} } catch { nav.value = {} }
   try {
-    const rRes: any = await request.get(`/api/public/recommend/articles/${res.data.id}`, { params: { scene: 'DETAIL', size: 6 } })
-    relatedArticles.value = rRes.data || []
+    const rRes: any = await request.get(`/api/public/recommend/articles/${a.id}`, { params: { scene: 'DETAIL', size: 2 } })
+    relatedArticles.value = (rRes.data || []).slice(0, 2)
     for (const r of relatedArticles.value) {
-      request.post('/api/public/recommend/exposure', { articleId: res.data.id, recommendedArticleId: r.id, scene: 'DETAIL' }).catch(() => {})
+      request.post('/api/public/recommend/exposure', { articleId: a.id, recommendedArticleId: r.id, scene: 'DETAIL' }).catch(() => {})
     }
   } catch { relatedArticles.value = [] }
 
@@ -356,9 +472,12 @@ async function loadArticle(slug: string) {
   addCodeCopyButtons()
   addImageClickHandlers()
 
+  // Init related articles indicator
+  nextTick(() => { onRelatedScroll() })
+
   // Load like status
   try {
-    const likeRes: any = await getLikeStatus(res.data.id)
+    const likeRes: any = await getLikeStatus(a.id)
     liked.value = likeRes.data.liked
   } catch {}
 
@@ -526,6 +645,14 @@ onMounted(() => {
   document.addEventListener('mousedown', () => { selectionTooltip.visible = false })
   startReadingTimer()
 })
+
+watch(() => route.params.slug, (newSlug) => {
+  if (newSlug && route.name === 'ArticleDetail') {
+    loadArticle(newSlug as string)
+    scrollToTop()
+  }
+})
+
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   document.removeEventListener('mouseup', handleTextSelection)
@@ -535,11 +662,64 @@ onUnmounted(() => {
   if (jsonLd) jsonLd.remove()
 })
 watch(() => route.params.slug, (slug) => { if (slug) loadArticle(slug as string) })
+
+function retryLoad() {
+  loadArticle(route.params.slug as string)
+}
+
+// Related articles indicator logic
+function onRelatedScroll() {
+  const el = relatedScrollRef.value
+  if (!el) return
+  const cardWidth = 304 // 280 min-width + 24 gap
+  const visibleCards = Math.round(el.clientWidth / cardWidth) || 1
+  relatedTotalPages.value = Math.max(1, Math.ceil(relatedArticles.value.length / visibleCards))
+  const pageIndex = Math.round(el.scrollLeft / (visibleCards * cardWidth)) + 1
+  relatedPage.value = Math.min(pageIndex, relatedTotalPages.value)
+}
+
+function scrollRelatedToPage(page: number) {
+  const el = relatedScrollRef.value
+  if (!el) return
+  const cardWidth = 304
+  const visibleCards = Math.round(el.clientWidth / cardWidth) || 1
+  el.scrollTo({ left: (page - 1) * visibleCards * cardWidth, behavior: 'smooth' })
+}
 </script>
 
 <style scoped>
 /* ===== Page ===== */
 .article-page { position: relative; }
+
+/* ===== Loading Skeleton ===== */
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+.skeleton-header { text-align: center; margin-bottom: 40px; display: flex; flex-direction: column; align-items: center; }
+.skeleton-tags { display: flex; gap: 8px; margin-bottom: 24px; }
+.skeleton-tag { width: 60px; height: 24px; border-radius: 99px; }
+.skeleton-title { width: 80%; height: 56px; margin-bottom: 12px; border-radius: 12px; }
+.skeleton-title-short { width: 50%; height: 56px; margin-bottom: 24px; border-radius: 12px; }
+.skeleton-meta { width: 60%; height: 20px; border-radius: 10px; }
+.skeleton-cover { width: 100%; aspect-ratio: 16/9; border-radius: 20px; margin-bottom: 48px; }
+.skeleton-body { display: flex; flex-direction: column; gap: 16px; }
+.skeleton-line { height: 20px; border-radius: 6px; }
+
+/* ===== Error State ===== */
+.error-state {
+  max-width: 480px; margin: 100px auto; padding: 48px;
+  text-align: center; border-radius: 24px;
+}
+.error-icon { font-size: 64px; margin-bottom: 16px; animation: float 3s ease-in-out infinite; }
+.error-state h2 { font-family: var(--font-heading); font-size: 24px; color: var(--text-primary); margin-bottom: 12px; }
+.error-state p { color: var(--text-muted); margin-bottom: 32px; font-size: 15px; }
+.error-actions { display: flex; gap: 16px; justify-content: center; }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
 /* ===== AI Summary Card ===== */
 .ai-summary-card {
@@ -624,6 +804,15 @@ watch(() => route.params.slug, (slug) => { if (slug) loadArticle(slug as string)
 .toolbar-btn.active { color: var(--accent-rose); background: rgba(244,63,94,0.1); }
 .toolbar-btn span { font-size: 13px; }
 .toolbar-divider { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+@keyframes likeBurst {
+  0% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+  50% { transform: scale(1.4); filter: drop-shadow(0 0 12px rgba(244,63,94,0.8)); color: var(--accent-rose); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+}
+.toolbar-btn.like-anim svg {
+  animation: likeBurst 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
 
 /* Transitions */
 .slide-in-enter-active, .slide-in-leave-active { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -787,10 +976,11 @@ watch(() => route.params.slug, (slug) => { if (slug) loadArticle(slug as string)
 .related-scroll {
   display: flex; gap: 24px; overflow-x: auto;
   scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
-  padding-bottom: 24px; padding-top: 12px;
-  scrollbar-width: none; /* Firefox */
+  padding: 12px 20px 24px; margin: 0 -20px;
+  scroll-behavior: smooth;
+  scrollbar-width: none; /* Firefox: hide scrollbar */
 }
-.related-scroll::-webkit-scrollbar { display: none; }
+.related-scroll::-webkit-scrollbar { display: none; /* Chrome/Safari: hide scrollbar */ }
 .related-card {
   min-width: 280px; max-width: 320px; flex-shrink: 0;
   scroll-snap-align: start; overflow: hidden;
@@ -802,6 +992,22 @@ watch(() => route.params.slug, (slug) => { if (slug) loadArticle(slug as string)
 .related-body { padding: 20px; }
 .related-body h4 { font-family: var(--font-heading); font-size: 16px; color: var(--text-primary); margin-bottom: 8px; font-weight: 700; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .card-meta { font-size: 13px; color: var(--text-dim); font-weight: 500; }
+
+/* Pill dot indicators */
+.related-indicators {
+  display: flex; justify-content: center; align-items: center;
+  gap: 8px; margin-top: 20px;
+}
+.related-dot {
+  width: 8px; height: 8px; border-radius: 4px;
+  background: var(--border);
+  border: none; padding: 0; cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.related-dot:hover { background: var(--text-dim); }
+.related-dot.is-active {
+  width: 24px; background: #9333ea;
+}
 
 /* ===== Subscribe CTA ===== */
 .subscribe-cta { padding: 48px; text-align: center; margin: 48px 0; position: relative; overflow: hidden; }
@@ -815,6 +1021,14 @@ watch(() => route.params.slug, (slug) => { if (slug) loadArticle(slug as string)
 }
 .cta-form input:focus { border-color: var(--primary); background: var(--bg-elevated); box-shadow: 0 0 20px rgba(168,85,247,0.15); }
 .success-msg { color: var(--accent-green); margin-top: 12px; }
+
+/* ===== Mobile TOC ===== */
+.mobile-toc { display: none; margin-bottom: 24px; padding: 16px 20px; border-radius: 12px; }
+.mobile-toc summary { font-family: var(--font-heading); font-weight: 700; cursor: pointer; color: var(--text-primary); outline: none; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+.mobile-toc summary::-webkit-details-marker { display: none; }
+.mobile-toc summary::after { content: '▼'; font-size: 12px; transition: transform 0.3s; }
+.mobile-toc[open] summary::after { transform: rotate(180deg); }
+.mobile-toc .toc-nav { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; max-height: 50vh; overflow-y: auto; }
 
 /* ===== TOC Sidebar — Glass Fixed Panel ===== */
 .toc-sidebar { width: 260px; flex-shrink: 0; position: sticky; top: 88px; }
@@ -867,6 +1081,7 @@ watch(() => route.params.slug, (slug) => { if (slug) loadArticle(slug as string)
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
   .toc-sidebar { display: none; }
+  .mobile-toc { display: block; }
   .article-title { font-size: 36px; }
 }
 @media (max-width: 768px) {

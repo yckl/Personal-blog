@@ -57,6 +57,13 @@ public class AiServiceImpl implements AiService {
     }
 
     @Override
+    public String generateAbstract(String content, Long articleId, Long userId) {
+        return callAi("abstract", articleId, userId, content,
+                "You are an AI assistant. Summarize the following article precisely into 3 distinct bullet points. Keep it professional. Output strictly as a JSON array of 3 strings.",
+                "Summarize this:\n\n" + truncate(content));
+    }
+
+    @Override
     public String generateSeoTitle(String content, String currentTitle, Long articleId, Long userId) {
         String input = "Current title: " + currentTitle + "\n\nContent:\n" + truncate(content);
         return callAi("seo_title", articleId, userId, input,
@@ -173,6 +180,7 @@ public class AiServiceImpl implements AiService {
         return switch (taskType) {
             case "title" -> "[\"" + snippet + " — 深度解析与实战指南\", \"从零理解" + snippet + "：核心概念全解\", \"" + snippet + "最佳实践总结\"]";
             case "summary" -> "本文深入探讨了" + snippet + "的核心概念与实践应用，为读者提供了清晰的理解路径和实用的操作建议。（AI 未配置，此为默认摘要，请在 application.yml 中设置 ai.api-key）";
+            case "abstract" -> "[\"本文系统复盘了关于" + snippet + "的工程演进与基础设定。\", \"揭示了目前在部署该模块时所面临的核心挑战与解决思路。\", \"提供了一套工业强度的标准化落地规范以供后续实践参考。\"]";
             case "seo_title" -> "[\"" + snippet + " 完全指南 | 博客\", \"深入理解" + snippet + " - 实战教程\", \"" + snippet + " 从入门到精通\"]";
             case "meta_description" -> "深入了解" + snippet + "的核心概念、最佳实践与常见问题。本文为您提供全面的指导。（请配置 AI API Key 获取真实结果）";
             case "outline" -> "## 引言\n\n## 核心概念\n\n### 概念一\n\n### 概念二\n\n## 实践应用\n\n### 场景分析\n\n### 代码示例\n\n## 常见问题\n\n## 总结与展望";

@@ -132,6 +132,15 @@ public class JwtTokenProvider {
         }
     }
 
+    /**
+     * Get remaining expiration time in milliseconds for a valid token.
+     */
+    public long getRemainingExpiration(String token) {
+        Claims claims = parseToken(token);
+        Date expiration = claims.getExpiration();
+        return expiration.getTime() - System.currentTimeMillis();
+    }
+
     private Claims parseToken(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())

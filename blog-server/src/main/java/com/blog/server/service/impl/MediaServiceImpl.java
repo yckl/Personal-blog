@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import net.coobird.thumbnailator.Thumbnails;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -23,7 +24,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -42,18 +42,30 @@ public class MediaServiceImpl implements MediaService {
     @Value("${upload.max-size:52428800}")
     private long maxFileSize; // 50MB default
 
-    /** Allowed MIME types */
-    private static final Set<String> ALLOWED_MIME = Set.of(
+    /** Allowed MIME types and mapping to safe extensions */
+    private static final java.util.Map<String, String> MIME_TO_EXT = java.util.Map.ofEntries(
             // Images
-            "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp",
+            java.util.Map.entry("image/jpeg", ".jpg"),
+            java.util.Map.entry("image/png", ".png"),
+            java.util.Map.entry("image/gif", ".gif"),
+            java.util.Map.entry("image/webp", ".webp"),
+            java.util.Map.entry("image/svg+xml", ".svg"),
+            java.util.Map.entry("image/bmp", ".bmp"),
             // Video
-            "video/mp4", "video/webm", "video/quicktime",
+            java.util.Map.entry("video/mp4", ".mp4"),
+            java.util.Map.entry("video/webm", ".webm"),
+            java.util.Map.entry("video/quicktime", ".mov"),
             // Audio
-            "audio/mpeg", "audio/wav", "audio/ogg", "audio/flac",
+            java.util.Map.entry("audio/mpeg", ".mp3"),
+            java.util.Map.entry("audio/wav", ".wav"),
+            java.util.Map.entry("audio/ogg", ".ogg"),
+            java.util.Map.entry("audio/flac", ".flac"),
             // Documents
-            "application/pdf", "application/zip", "application/x-zip-compressed",
-            "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            java.util.Map.entry("application/pdf", ".pdf"),
+            java.util.Map.entry("application/zip", ".zip"),
+            java.util.Map.entry("application/x-zip-compressed", ".zip"),
+            java.util.Map.entry("application/msword", ".doc"),
+            java.util.Map.entry("application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx")
     );
 
     private static final int THUMBNAIL_SIZE = 400;
@@ -69,16 +81,14 @@ public class MediaServiceImpl implements MediaService {
             throw new BusinessException("File exceeds maximum size of " + (maxFileSize / 1024 / 1024) + "MB");
         }
         String mimeType = file.getContentType();
-        if (mimeType == null || !ALLOWED_MIME.contains(mimeType)) {
+        if (mimeType == null || !MIME_TO_EXT.containsKey(mimeType)) {
             throw new BusinessException("File type not allowed: " + mimeType);
         }
 
         // ---- Storage ----
         String originalName = file.getOriginalFilename();
-        String extension = "";
-        if (originalName != null && originalName.contains(".")) {
-            extension = originalName.substring(originalName.lastIndexOf("."));
-        }
+        String extension = MIME_TO_EXT.get(mimeType); // Strictly enforce safe extension
+
 
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String baseName = UUID.randomUUID().toString().replace("-", "");
@@ -90,7 +100,15 @@ public class MediaServiceImpl implements MediaService {
 
         try {
             Files.createDirectories(dirPath);
-            file.transferTo(filePath.toFile());
+            if (mimeType != null && mimeType.startsWith("image/") && !mimeType.equals("image/svg+xml") && !mimeType.equals("image/gif")) {
+                // Compress and scale large images to max 1920px bounds at 80% quality
+                Thumbnails.of(file.getInputStream())
+                        .size(1920, 1920)
+                        .outputQuality(0.8)
+                        .toFile(filePath.toFile());
+            } else {
+                file.transferTo(filePath.toFile());
+            }
         } catch (IOException e) {
             log.error("Failed to upload file", e);
             throw new BusinessException("File upload failed");
