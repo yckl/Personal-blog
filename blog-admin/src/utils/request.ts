@@ -3,8 +3,10 @@ import axios from 'axios'
 let isRefreshing = false
 let pendingRequests: Array<(token: string) => void> = []
 
+const API_BASE = ''
+
 const request = axios.create({
-  baseURL: import.meta.env.DEV ? '' : 'http://localhost:8088',
+  baseURL: API_BASE,
   timeout: 15000,
 })
 
@@ -71,8 +73,7 @@ async function handle401(originalConfig: any) {
 
   try {
     // Call refresh endpoint directly to avoid interceptor loops
-    const apiBase = import.meta.env.DEV ? '' : 'http://localhost:8088'
-    const res = await axios.post(`${apiBase}/api/admin/auth/refresh`, {
+    const res = await axios.post(`${API_BASE}/api/admin/auth/refresh`, {
       refreshToken
     })
 

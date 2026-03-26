@@ -1,8 +1,10 @@
 import axios from 'axios'
 import router from '../router'
 
+const API_BASE = ''
+
 const request = axios.create({
-  baseURL: import.meta.env.DEV ? '' : 'http://localhost:8088',
+  baseURL: API_BASE,
   timeout: 15000,
 })
 
@@ -68,7 +70,7 @@ request.interceptors.response.use(
       if (refreshToken) {
         try {
           const res = await axios.post(
-            (import.meta.env.DEV ? '' : 'http://localhost:8088') + '/api/member/auth/refresh',
+            API_BASE + '/api/member/auth/refresh',
             { refreshToken }
           )
           const newToken = res.data?.data?.token

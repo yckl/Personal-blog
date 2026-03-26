@@ -49,7 +49,7 @@ async function handleDownload(token: string) {
   try {
     const res: any = await request.get(`/api/products/download/${token}`)
     if (res.data?.fileUrl) {
-      window.open('http://localhost:8088' + res.data.fileUrl, '_blank')
+      window.open(res.data.fileUrl, '_blank')
     } else { alert('无法获取文件链接') }
   } catch (e: any) { alert(e.message || '下载失败') }
 }

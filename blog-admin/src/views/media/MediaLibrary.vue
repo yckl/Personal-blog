@@ -169,7 +169,7 @@ const selectedFile = ref<any>(null)
 const altTextEdit = ref('')
 
 const acceptTypes = 'image/*,video/*,audio/*,.pdf,.zip,.doc,.docx'
-const baseUrl = 'http://localhost:8088'
+const baseUrl = ''
 
 function getUrl(path: string) {
   if (!path) return ''
