@@ -38,7 +38,7 @@
       <div class="seo-card glass-admin">
         <h4 class="card-label">💻 自定义脚本</h4>
         <el-form :model="config" label-width="160px">
-          <el-form-item label="头部脚本"><el-input v-model="config.custom_head_scripts" type="textarea" :rows="4" placeholder="<script>...</script>" /></el-form-item>
+          <el-form-item label="头部脚本"><el-input v-model="config.custom_head_scripts" type="textarea" :rows="4" :placeholder="'<script>...</script>'" /></el-form-item>
         </el-form>
       </div>
     </div>
