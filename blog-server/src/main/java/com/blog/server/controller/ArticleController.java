@@ -125,7 +125,7 @@ public class ArticleController {
     }
 
     @RateLimit(maxRequests = 20, windowSeconds = 60)
-    @GetMapping("/api/articles/{id}/ai-summary")
+    @GetMapping({"/api/articles/{id}/ai-summary", "/api/public/articles/{id}/ai-summary"})
     public Result<String> getArticleAiSummary(@PathVariable Long id) {
         ArticleVO article = articleService.getArticleById(id);
         if (article == null || !"PUBLISHED".equals(article.getStatus())) {

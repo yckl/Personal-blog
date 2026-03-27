@@ -53,6 +53,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/visits").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/visits/*/stay").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/articles/*/like").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/articles", "/api/articles/**").permitAll()
                 // SEO endpoints
                 .requestMatchers("/sitemap.xml", "/robots.txt").permitAll()
                 .requestMatchers("/api/redirect").permitAll()

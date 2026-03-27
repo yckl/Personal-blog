@@ -300,7 +300,7 @@ async function generateAiSummary() {
   aiError.value = ''
   aiSummaryList.value = []
   try {
-    const res: any = await request.get(`/api/articles/${article.value.id}/ai-summary`)
+    const res: any = await request.get(`/api/public/articles/${article.value.id}/ai-summary`)
     let summaryJson = res.data || '[]'
     
     // Fallback parsing
@@ -454,7 +454,11 @@ async function loadArticle(slug: string) {
   })
 
   const visitorId = localStorage.getItem('visitor_id') || (() => {
-    const id = crypto.randomUUID(); localStorage.setItem('visitor_id', id); return id
+    const id = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+      ? globalThis.crypto.randomUUID()
+      : `visitor_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+    localStorage.setItem('visitor_id', id)
+    return id
   })()
   recordVisit({ articleId: a.id, pageUrl: window.location.href, visitorId, pageType: 'article' }).catch(() => {})
 
